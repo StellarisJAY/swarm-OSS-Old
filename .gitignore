@@ -1,0 +1,9 @@
+/swarm-commons/target/
+/swarm-namenode/target/
+/swarm-datanode/target/
+/swarm-datanode/src/test/
+/swarm-namenode/src/test/
+/swarm-dfs.iml
+/swarm-client/target/
+/.idea/
+/swarm-client/src/test/
