@@ -20,6 +20,4 @@ public class ScheduleUtil {
             return new Thread(r, "schedule-thread-" + threadId.getAndIncrement());
         }
     });
-
-    
 }
