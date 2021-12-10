@@ -5,6 +5,7 @@ import com.jay.swarm.overseer.config.OverseerConfig;
 import com.jay.swarm.overseer.handler.PacketHandler;
 import com.jay.swarm.overseer.meta.MetaDataManager;
 import com.jay.swarm.overseer.meta.Persistence;
+import com.jay.swarm.overseer.storage.StorageManager;
 
 /**
  * <p>
@@ -22,18 +23,21 @@ public class Overseer {
 
     private final Persistence persistence;
 
+    private final StorageManager storageManager;
+
     private final OverseerConfig config;
 
     public Overseer(OverseerConfig config) {
         this.config = config;
         metaDataManager = new MetaDataManager();
+        storageManager = new StorageManager(config);
         overseerServer = new BaseServer();
         persistence = new Persistence(metaDataManager);
     }
 
     public void init(){
         // 添加Handler
-        overseerServer.addHandler(new PacketHandler());
+        overseerServer.addHandler(new PacketHandler(storageManager, metaDataManager));
         // 启动持久化任务
         persistence.init(30 * 1000);
     }

@@ -56,4 +56,15 @@ public class StorageManager {
         }
         return true;
     }
+
+    public void storageHeartBeat(Storage storage) throws IllegalAccessException {
+        Storage existingStorage = storages.get(storage.getId());
+        // 节点不存在 或者 节点地址不匹配
+        if(existingStorage == null || !storage.getHost().equals(existingStorage.getHost()) || storage.getPort() != existingStorage.getPort()){
+            throw new IllegalAccessException("heat beat failed, storage node info mismatch");
+        }
+        // 更新心跳时间
+        existingStorage.setLastHeartBeatTime(System.currentTimeMillis());
+        existingStorage.setDiskUsagePercent(storage.getDiskUsagePercent());
+    }
 }
