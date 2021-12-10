@@ -1,5 +1,6 @@
 package com.jay.swarm.overseer.storage;
 
+import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.Storage;
 import com.jay.swarm.overseer.config.OverseerConfig;
@@ -15,10 +16,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2021/12/10
  **/
 public class StorageManager {
-    private final OverseerConfig config;
+    private final Config config;
     private final ConcurrentHashMap<String, Storage> storages = new ConcurrentHashMap<>(256);
 
-    public StorageManager(OverseerConfig config) {
+    public StorageManager(Config config) {
         this.config = config;
     }
 

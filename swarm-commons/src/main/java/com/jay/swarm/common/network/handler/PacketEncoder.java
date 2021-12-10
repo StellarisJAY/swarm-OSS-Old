@@ -17,7 +17,7 @@ public class PacketEncoder extends MessageToByteEncoder<NetworkPacket> {
     @Override
     protected void encode(ChannelHandlerContext ctx, NetworkPacket msg, ByteBuf out) throws Exception {
         if(msg != null){
-            msg.setLength(msg.getLength() + NetworkPacket.HEADER_LENGTH);
+            msg.setLength(msg.getContent() == null ? 0 : msg.getContent().length + NetworkPacket.HEADER_LENGTH);
             NetworkPacket.encode(msg, out);
         }
     }

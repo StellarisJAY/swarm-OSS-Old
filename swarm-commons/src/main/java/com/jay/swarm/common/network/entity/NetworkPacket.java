@@ -124,4 +124,11 @@ public class NetworkPacket {
     public void setLength(int length) {
         this.length = length;
     }
+
+    public static NetworkPacket buildPacketOfType(short packetType, byte[] content){
+        return NetworkPacket.builder()
+                .type(packetType)
+                .content(content)
+                .build();
+    }
 }

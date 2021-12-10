@@ -53,8 +53,8 @@ public class BaseClient {
             addHandler(new BaseClientHandler(responseWaitSet));
             ChannelFuture channelFuture = bootstrap.connect().sync();
             channel = channelFuture.channel();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
