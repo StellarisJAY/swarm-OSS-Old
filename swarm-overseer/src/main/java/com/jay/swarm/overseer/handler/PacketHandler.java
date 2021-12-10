@@ -62,6 +62,7 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
             Storage storage = serializer.deserialize(content, Storage.class);
             // 注册存储节点
             boolean status = storageManager.registerStorage(storage);
+            log.info("Storage Node {} registered", storage.getId());
             return NetworkPacket.builder()
                     .type(PacketTypes.STORAGE_REGISTER_RESPONSE)
                     .id(packet.getId())
