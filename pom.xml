@@ -9,6 +9,9 @@
     <version>1.0-SNAPSHOT</version>
     <modules>
         <module>swarm-commons</module>
+        <module>swarm-client</module>
+        <module>swarm-overseer</module>
+        <module>swarm-storage</module>
     </modules>
 
     <packaging>pom</packaging>
