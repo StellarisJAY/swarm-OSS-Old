@@ -31,12 +31,8 @@ public class BaseClient {
 
     private AtomicInteger idProvider = new AtomicInteger(1);
 
-    private long retryTime;
-    private long retryTimeout;
 
-    public BaseClient(long retryTime, long retryTimeout) {
-        this.retryTime = retryTime;
-        this.retryTimeout = retryTimeout;
+    public BaseClient() {
     }
 
     public void addHandler(ChannelHandler handler){
