@@ -37,6 +37,7 @@ public class MetaDataManager {
      * @return List
      */
     protected List<MetaData> copyOfCache(){
+        // 对元数据缓存加锁，然后复制整个缓存
         synchronized (metaCache){
             Collection<MetaData> values = metaCache.values();
             return new ArrayList<>(values);

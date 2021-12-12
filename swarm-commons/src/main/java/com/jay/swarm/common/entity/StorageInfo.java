@@ -17,7 +17,7 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class Storage {
+public class StorageInfo {
     private String id;
 
     private String host;
@@ -26,7 +26,9 @@ public class Storage {
 
     private long lastHeartBeatTime;
 
-    private double diskUsagePercent;
+    private long usedStorage;
+
+    private long freeStorage;
 
 
 }

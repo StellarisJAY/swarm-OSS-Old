@@ -1,12 +1,13 @@
 package com.jay.swarm.overseer.handler;
 
-import com.jay.swarm.common.entity.Storage;
+import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.overseer.meta.MetaDataManager;
 import com.jay.swarm.overseer.storage.StorageManager;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -34,13 +35,26 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, NetworkPacket packet) {
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        log.info("connection closed by remote address {}", ctx.channel().remoteAddress());
+        storageManager.removeChannel(ctx.channel());
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        if(log.isDebugEnabled()){
+            log.debug("exception caught from channel: " + ctx.channel().remoteAddress(), cause);
+        }
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, NetworkPacket packet) {
         short packetType = packet.getType();
         NetworkPacket response = null;
         // 根据报文类型做不同处理，最终得到一个Response packet
         switch(packetType){
             // 注册存储节点
-            case PacketTypes.STORAGE_REGISTER: response = handleStorageRegister(packet);break;
+            case PacketTypes.STORAGE_REGISTER: response = handleStorageRegister(packet, ctx.channel());break;
             // 存储节点心跳
             case PacketTypes.HEART_BEAT: response = handleStorageHeartBeat(packet); break;
 
@@ -48,10 +62,10 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
         }
 
         // 发送response
-        channelHandlerContext.channel().writeAndFlush(response);
+        ctx.channel().writeAndFlush(response);
     }
 
-    private NetworkPacket handleStorageRegister(NetworkPacket packet){
+    private NetworkPacket handleStorageRegister(NetworkPacket packet, Channel channel){
         try{
             byte[] content = packet.getContent();
             if(content == null){
@@ -59,10 +73,10 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
             }
             Serializer serializer = new ProtoStuffSerializer();
             // 反序列化报文content
-            Storage storage = serializer.deserialize(content, Storage.class);
+            StorageInfo storageInfo = serializer.deserialize(content, StorageInfo.class);
             // 注册存储节点
-            boolean status = storageManager.registerStorage(storage);
-            log.info("Storage Node {} registered", storage.getId());
+            boolean status = storageManager.registerStorage(storageInfo, channel);
+            log.info("Storage Node {} registered", storageInfo.getId());
             return NetworkPacket.builder()
                     .type(PacketTypes.STORAGE_REGISTER_RESPONSE)
                     .id(packet.getId())
@@ -87,8 +101,8 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
                 throw new RuntimeException("no content found in heart beat packet");
             }
             Serializer serializer = new ProtoStuffSerializer();
-            Storage storage = serializer.deserialize(content, Storage.class);
-            storageManager.storageHeartBeat(storage);
+            StorageInfo storageInfo = serializer.deserialize(content, StorageInfo.class);
+            storageManager.storageHeartBeat(storageInfo);
 
             return NetworkPacket.builder()
                     .type(PacketTypes.HEART_BEAT)
