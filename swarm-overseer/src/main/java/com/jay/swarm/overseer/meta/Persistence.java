@@ -16,7 +16,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
- *
+ *  持久化工具
+ *  目前的持久化使用序列化+写入文件方式
+ *  经过测试：10w条缓存数据的持久化停顿时间为500ms左右。
+ *  准备加入类似Redis的AOF持久化方式，减轻持久化过程、提高实时性。
  * </p>
  *
  * @author Jay

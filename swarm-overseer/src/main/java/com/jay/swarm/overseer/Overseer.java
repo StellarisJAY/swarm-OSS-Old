@@ -2,7 +2,6 @@ package com.jay.swarm.overseer;
 
 import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.network.BaseServer;
-import com.jay.swarm.overseer.config.OverseerConfig;
 import com.jay.swarm.overseer.handler.PacketHandler;
 import com.jay.swarm.overseer.meta.MetaDataManager;
 import com.jay.swarm.overseer.meta.Persistence;
@@ -13,7 +12,7 @@ import java.io.*;
 
 /**
  * <p>
- *
+ *  OVERSEER节点主类
  * </p>
  *
  * @author Jay
@@ -21,13 +20,24 @@ import java.io.*;
  */
 @Slf4j
 public class Overseer {
-
+    /**
+     * 元数据管理器
+     */
     private final MetaDataManager metaDataManager;
 
+    /**
+     * Overseer网络服务器
+     */
     private final BaseServer overseerServer;
 
+    /**
+     * 持久化工具
+     */
     private final Persistence persistence;
 
+    /**
+     * 存储节点管理器
+     */
     private final StorageManager storageManager;
 
     private final Config config;
@@ -40,8 +50,12 @@ public class Overseer {
         persistence = new Persistence(metaDataManager);
     }
 
+    /**
+     * 初始化Overseer
+     */
     public void init(){
         long initStart = System.currentTimeMillis();
+        // 从配置文件获取port
         String port = config.get("server.port");
         if(port == null || !port.matches("^[0-9]*$")){
             throw new RuntimeException("failed to start Overseer Node, wrong port config");
@@ -51,6 +65,7 @@ public class Overseer {
         overseerServer.addHandler(new PacketHandler(storageManager, metaDataManager));
         // 启动持久化任务
         persistence.init(30 * 1000);
+        // 开启Overseer服务器
         overseerServer.bind(Integer.parseInt(port));
         log.info("Overseer server started, listening port {}", port);
         log.info("Overseer Node init finished, time used: {}ms", (System.currentTimeMillis() - initStart));
