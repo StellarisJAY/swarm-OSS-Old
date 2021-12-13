@@ -4,11 +4,14 @@ import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.network.BaseClient;
+import com.jay.swarm.common.network.BaseServer;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
+import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.common.util.ScheduleUtil;
+import com.jay.swarm.storage.handler.StorageNodeHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -31,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 public class StorageNode {
     private final BaseClient client;
+    private final BaseServer server;
     private final Config config;
     private final String nodeId;
 
@@ -41,6 +45,8 @@ public class StorageNode {
 
     public StorageNode(Config config) throws UnknownHostException {
         client = new BaseClient();
+        server = new BaseServer();
+        server.addHandler(new StorageNodeHandler(new FileTransferHandler(STORAGE_PATH)));
         this.config = config;
         // 生成节点ID
         this.nodeId = UUID.randomUUID().toString();
@@ -58,11 +64,18 @@ public class StorageNode {
             // 获取Overseer地址
             String host = config.get("overseer.host");
             String port = config.get("overseer.port");
+            String serverPort = config.get("server.port");
             if(host == null || port == null || !port.matches("^[0-9]*$")){
                 throw new RuntimeException("failed to start Storage Node, wrong Overseer Node Address");
             }
+            if(serverPort == null || !serverPort.matches("^[0-9]*$")){
+                throw new RuntimeException("failed to start storage Node serve, wrong port");
+            }
             printBanner();
             checkStoragePath();
+
+            server.bind(Integer.parseInt(serverPort));
+            log.info("Storage Node server started, listening: {}", serverPort);
             // 连接Overseer
             client.connect(host, Integer.parseInt(port));
             // 注册节点
@@ -89,7 +102,7 @@ public class StorageNode {
 
     /**
      * 注册StorageNode
-     * @throws Exception
+     * @throws Exception exception
      */
     public void registerNode() throws Exception {
         try{
@@ -160,7 +173,7 @@ public class StorageNode {
             if(inputStream != null){
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
                 BufferedReader reader = new BufferedReader(inputStreamReader);
-                String line = null;
+                String line;
                 while((line = reader.readLine()) != null){
                     System.out.println(line);
                 }

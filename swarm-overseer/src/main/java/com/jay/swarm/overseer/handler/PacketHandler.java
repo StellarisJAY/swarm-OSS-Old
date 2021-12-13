@@ -35,13 +35,13 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public void channelInactive(ChannelHandlerContext ctx) {
         log.info("connection closed by remote address {}", ctx.channel().remoteAddress());
         storageManager.removeChannel(ctx.channel());
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)  {
         if(log.isDebugEnabled()){
             log.debug("exception caught from channel: " + ctx.channel().remoteAddress(), cause);
         }
@@ -61,8 +61,10 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
             default:break;
         }
 
-        // 发送response
-        ctx.channel().writeAndFlush(response);
+        if(response != null){
+            // 发送response
+            ctx.channel().writeAndFlush(response);
+        }
     }
 
     private NetworkPacket handleStorageRegister(NetworkPacket packet, Channel channel){

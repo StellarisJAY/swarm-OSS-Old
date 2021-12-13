@@ -59,7 +59,6 @@ public class NetworkPacket {
      * 将packet对象编码写入ByteBuf
      * @param packet 数据包
      * @param buffer ByteBuf
-     * @return ByteBuf
      */
     public static void encode(NetworkPacket packet, ByteBuf buffer){
         buffer.writeShort(MAGIC_NUMBER);
@@ -98,6 +97,8 @@ public class NetworkPacket {
         // 读取content
         byte[] content = new byte[contentLength];
         buffer.readBytes(content);
+
+        buffer.release();
 
         return builder().length(length)
                 .type(type)
