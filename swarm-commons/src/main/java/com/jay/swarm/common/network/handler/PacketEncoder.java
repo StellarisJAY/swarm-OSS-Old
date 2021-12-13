@@ -15,9 +15,9 @@ import io.netty.handler.codec.MessageToByteEncoder;
  **/
 public class PacketEncoder extends MessageToByteEncoder<NetworkPacket> {
     @Override
-    protected void encode(ChannelHandlerContext ctx, NetworkPacket msg, ByteBuf out) throws Exception {
+    protected void encode(ChannelHandlerContext ctx, NetworkPacket msg, ByteBuf out) {
         if(msg != null){
-            msg.setLength(msg.getContent() == null ? 0 : msg.getContent().length + NetworkPacket.HEADER_LENGTH);
+            msg.setLength(msg.getContent() == null ? NetworkPacket.HEADER_LENGTH : msg.getContent().length + NetworkPacket.HEADER_LENGTH);
             NetworkPacket.encode(msg, out);
         }
     }
