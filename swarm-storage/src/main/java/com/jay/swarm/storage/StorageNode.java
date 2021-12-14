@@ -3,6 +3,9 @@ package com.jay.swarm.storage;
 import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.StorageInfo;
+import com.jay.swarm.common.fs.FileInfoCache;
+import com.jay.swarm.common.fs.locator.FileLocator;
+import com.jay.swarm.common.fs.locator.Md5FileLocator;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.BaseServer;
 import com.jay.swarm.common.network.entity.NetworkPacket;
@@ -11,6 +14,7 @@ import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.common.util.ScheduleUtil;
+import com.jay.swarm.storage.handler.FileDownloadHandler;
 import com.jay.swarm.storage.handler.StorageNodeHandler;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,13 +44,17 @@ public class StorageNode {
 
     private final String host;
     private final int port;
+    private final FileInfoCache fileInfoCache;
 
     private static final String STORAGE_PATH = "D:/storage";
 
     public StorageNode(Config config) throws UnknownHostException {
         client = new BaseClient();
         server = new BaseServer();
-        server.addHandler(new StorageNodeHandler(new FileTransferHandler(STORAGE_PATH)));
+        FileLocator locator = new Md5FileLocator(STORAGE_PATH);
+        fileInfoCache = new FileInfoCache(locator);
+
+        server.addHandler(new StorageNodeHandler(new FileTransferHandler(STORAGE_PATH, fileInfoCache), new FileDownloadHandler(fileInfoCache)));
         this.config = config;
         // 生成节点ID
         this.nodeId = UUID.randomUUID().toString();

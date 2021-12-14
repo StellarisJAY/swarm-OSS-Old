@@ -24,9 +24,11 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
      * 文件传输处理器
      */
     private final FileTransferHandler fileTransferHandler;
+    private final FileDownloadHandler downloadHandler;
 
-    public StorageNodeHandler(FileTransferHandler fileTransferHandler) {
+    public StorageNodeHandler(FileTransferHandler fileTransferHandler, FileDownloadHandler downloadHandler) {
         this.fileTransferHandler = fileTransferHandler;
+        this.downloadHandler = downloadHandler;
     }
 
     @Override
@@ -50,13 +52,10 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
             case PacketTypes.TRANSFER_FILE_HEAD:
             case PacketTypes.TRANSFER_FILE_BODY:
             case PacketTypes.TRANSFER_FILE_END:
-                fileTransferHandler.handle(packet);break;
+                fileTransferHandler.handle(channelHandlerContext, packet);break;
+            case PacketTypes.DOWNLOAD_REQUEST:
+                downloadHandler.handleDownloadRequest(channelHandlerContext, packet);
             default:break;
         }
-        NetworkPacket response = NetworkPacket.builder()
-                .id(packet.getId())
-                .content(null)
-                .type(PacketTypes.TRANSFER_RESPONSE).build();
-        channelHandlerContext.channel().writeAndFlush(response);
     }
 }

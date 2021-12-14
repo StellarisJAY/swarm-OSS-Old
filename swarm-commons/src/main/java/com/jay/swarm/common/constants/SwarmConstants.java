@@ -15,4 +15,6 @@ public class SwarmConstants {
     public static final long DEFAULT_HEARTBEAT_PERIOD = 30 * 1000;
 
     public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+
+    public static final int DEFAULT_SHARD_SIZE = 1024 * 1024 * 10;
 }
