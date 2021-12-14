@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * <p>
- *
+ *  StorageNode网络处理器
  * </p>
  *
  * @author Jay
@@ -20,6 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 @ChannelHandler.Sharable
 public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacket> {
 
+    /**
+     * 文件传输处理器
+     */
     private final FileTransferHandler fileTransferHandler;
 
     public StorageNodeHandler(FileTransferHandler fileTransferHandler) {
@@ -34,20 +37,26 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.info("channel handler error: ", cause);
+        if(log.isDebugEnabled()){
+            log.debug("channel handler error", cause);
+        }
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, NetworkPacket packet) {
         short type = packet.getType();
         switch (type){
+            // 处理文件传输请求
             case PacketTypes.TRANSFER_FILE_HEAD:
             case PacketTypes.TRANSFER_FILE_BODY:
             case PacketTypes.TRANSFER_FILE_END:
                 fileTransferHandler.handle(packet);break;
             default:break;
         }
-        NetworkPacket response = NetworkPacket.builder().id(packet.getId()).content(null).type(PacketTypes.TRANSFER_RESPONSE).build();
+        NetworkPacket response = NetworkPacket.builder()
+                .id(packet.getId())
+                .content(null)
+                .type(PacketTypes.TRANSFER_RESPONSE).build();
         channelHandlerContext.channel().writeAndFlush(response);
     }
 }

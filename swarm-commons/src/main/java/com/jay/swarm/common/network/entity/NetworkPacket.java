@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * <p>
  * Swarm-dfs网络通信基础报文。

@@ -1,7 +1,5 @@
 package com.jay.swarm.common.fs;
 
-import com.jay.swarm.common.fs.locator.FileLocator;
-import com.jay.swarm.common.fs.locator.Md5FileLocator;
 import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.util.FileUtil;
@@ -26,16 +24,28 @@ import java.util.Arrays;
  **/
 @Slf4j
 public class FileAppender {
+    /**
+     * 文件ID
+     */
     private final String fileId;
 
-    private final byte[] fileMD5;
+    /**
+     * 文件md5，用于传输校验
+     */
+    private final byte[] fileMd5;
 
+    /**
+     * 文件传输回调
+     */
     private final FileTransferCallback transferCallback;
 
-    private FileOutputStream outputStream;
-
-
-
+    /**
+     * 文件输出流
+     */
+    private final FileOutputStream outputStream;
+    /**
+     * 文件输出通道
+     */
     private final FileChannel fileChannel;
     /**
      * 目标文件总大小
@@ -50,46 +60,61 @@ public class FileAppender {
     /**
      * 分片个数
      */
-    private int shardCount;
+    private final int shardCount;
 
-    private long transferStartTime;
+    private final long transferStartTime;
 
-    public FileAppender(String fileId, String path, byte[] fileMD5, long totalSize, int shardCount) throws IOException {
-        this.fileMD5 = fileMD5;
+    public FileAppender(String fileId, String path, byte[] fileMd5, long totalSize, int shardCount) throws IOException {
+        this.fileMd5 = fileMd5;
         this.totalSize = totalSize;
         this.shardCount = shardCount;
         this.fileId = fileId;
 
         this.transferCallback = new DefaultFileTransferCallback(path);
         File file = new File(path);
-
+        // 创建文件的父目录
         File parent = file.getParentFile();
-        boolean mk = parent.mkdirs();
+        if(!parent.mkdirs()){
+            throw new RuntimeException("unable to create parent path");
+        }
         this.outputStream = new FileOutputStream(file);
         this.fileChannel = outputStream.getChannel();
         this.fileChannel.position(0);
         this.transferStartTime = System.currentTimeMillis();
     }
 
+    /**
+     * 末尾添加数据
+     * @param data 数据 byte[]
+     * @throws IOException IOException
+     */
     public void append(byte[] data) throws IOException {
+        // wrap 数据
         ByteBuffer buffer = ByteBuffer.wrap(data);
+        // 写入channel
         fileChannel.write(buffer);
         buffer.clear();
+        // 计算接收大小和接收进度
         receivedSize += data.length;
         float progress = new BigDecimal(receivedSize).multiply(new BigDecimal(100))
                 .divide(new BigDecimal(totalSize), 2, RoundingMode.HALF_DOWN)
                 .floatValue();
+        // 进度回调
         transferCallback.onProgress(fileId, totalSize, receivedSize, progress);
     }
 
+    /**
+     * 完成传输
+     */
     public void complete(){
         // 计算下载完成的文件md5
         String path = transferCallback.getFilePath();
         byte[] md5 = FileUtil.md5(path);
-        log.info("original md5: {}", Arrays.toString(fileMD5));
-        log.info("transfer md5: {}", Arrays.toString(md5));
+
         // 检查md5是否相等，判断文件在传输中是否损坏
-        if(!Arrays.equals(md5, fileMD5)){
+        if(!Arrays.equals(md5, fileMd5)){
+            log.info("original md5: {}", Arrays.toString(fileMd5));
+            log.info("transfer md5: {}", Arrays.toString(md5));
             throw new IllegalStateException("file damaged during transfer, fileID: " + fileId);
         }
         // 触发传输完成回调
@@ -97,6 +122,10 @@ public class FileAppender {
     }
 
 
+    /**
+     * 释放FileAppender
+     * 关闭channel和OutputStream
+     */
     public void release(){
         if(fileChannel != null){
             try{
