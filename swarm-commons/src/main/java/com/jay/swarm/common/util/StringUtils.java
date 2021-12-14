@@ -13,6 +13,10 @@ import java.security.NoSuchAlgorithmException;
  **/
 public class StringUtils {
 
+    public static boolean isEmpty(String str){
+        return str == null || str.length() == 0;
+    }
+
     public static int murmur2(final byte[] data) {
         int length = data.length;
         int seed = 0x9747b28c;
