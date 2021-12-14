@@ -16,20 +16,9 @@ import java.math.RoundingMode;
 @Slf4j
 public class DefaultFileTransferCallback implements FileTransferCallback {
 
-    private final String path;
-
-    public DefaultFileTransferCallback(String path) {
-        this.path = path;
-    }
-
-    @Override
-    public String getFilePath() {
-        return path;
-    }
-
     @Override
     public void onProgress(String fileId, long total, long current, float progress) {
-
+        log.info("file {} transfer progress: {} %", fileId, progress);
     }
 
     @Override

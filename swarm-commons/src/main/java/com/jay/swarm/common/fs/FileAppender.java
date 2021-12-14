@@ -61,6 +61,7 @@ public class FileAppender {
      * 分片个数
      */
     private final int shardCount;
+    private final String path;
 
     private final long transferStartTime;
 
@@ -69,12 +70,12 @@ public class FileAppender {
         this.totalSize = totalSize;
         this.shardCount = shardCount;
         this.fileId = fileId;
-
-        this.transferCallback = new DefaultFileTransferCallback(path);
+        this.path = path;
+        this.transferCallback = new DefaultFileTransferCallback();
         File file = new File(path);
         // 创建文件的父目录
         File parent = file.getParentFile();
-        if(!parent.mkdirs()){
+        if(!parent.exists() && !parent.mkdirs()){
             throw new RuntimeException("unable to create parent path");
         }
         this.outputStream = new FileOutputStream(file);
@@ -108,7 +109,6 @@ public class FileAppender {
      */
     public void complete(){
         // 计算下载完成的文件md5
-        String path = transferCallback.getFilePath();
         byte[] md5 = FileUtil.md5(path);
 
         // 检查md5是否相等，判断文件在传输中是否损坏

@@ -51,10 +51,17 @@ public class StorageNode {
     public StorageNode(Config config) throws UnknownHostException {
         client = new BaseClient();
         server = new BaseServer();
+        Serializer serializer = new ProtoStuffSerializer();
+        // 文件定位器
         FileLocator locator = new Md5FileLocator(STORAGE_PATH);
+        // 文件信息缓存
         fileInfoCache = new FileInfoCache(locator);
-
-        server.addHandler(new StorageNodeHandler(new FileTransferHandler(STORAGE_PATH, fileInfoCache), new FileDownloadHandler(fileInfoCache)));
+        // 传输处理器
+        FileTransferHandler transferHandler = new FileTransferHandler(fileInfoCache);
+        // 下载处理器
+        FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
+        // 服务器添加存储节点处理器
+        server.addHandler(new StorageNodeHandler(transferHandler, downloadHandler, locator, serializer));
         this.config = config;
         // 生成节点ID
         this.nodeId = UUID.randomUUID().toString();
