@@ -21,7 +21,7 @@ public class BaseClientHandler extends SimpleChannelInboundHandler<NetworkPacket
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, NetworkPacket packet) throws Exception {
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, NetworkPacket packet) {
         if(packet != null){
             int id = packet.getId();
             responseWaitSet.complete(id, packet);

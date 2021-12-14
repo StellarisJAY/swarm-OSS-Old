@@ -4,6 +4,8 @@ import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.fs.FileInfoCache;
 import com.jay.swarm.common.fs.FileShard;
+import com.jay.swarm.common.network.ShardedFileSender;
+import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
@@ -45,25 +47,12 @@ public class FileDownloadHandler {
             NetworkPacket headPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, headContent);
             ctx.channel().writeAndFlush(headPacket);
 
-            try(FileInputStream inputStream = new FileInputStream(new File(path))){
-                FileChannel channel = inputStream.getChannel();
-                ByteBuffer shardBuffer = ByteBuffer.allocate(SwarmConstants.DEFAULT_SHARD_SIZE);
-                int length;
-                while((length = channel.read(shardBuffer)) != -1){
-                    shardBuffer.rewind();
-                    byte[] shardContent = shardBuffer.array();
-                    FileShard shard = FileShard.builder().fileId(fileId).content(shardContent).build();
-                    byte[] serializedShard = serializer.serialize(shard, FileShard.class);
-                    NetworkPacket shardPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_BODY, shardContent);
-                    ctx.channel().writeAndFlush(shardPacket);
-                    shardBuffer.clear();
-                }
-
-                NetworkPacket endPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
-                endPacket.setId(packet.getId());
-                ctx.writeAndFlush(endPacket);
-            }
-
+            File file = new File(path);
+            ShardedFileSender shardedFileSender = new ShardedFileSender(ctx.channel(), serializer, new DefaultFileTransferCallback());
+            shardedFileSender.send(file, fileId);
+            NetworkPacket endPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
+            endPacket.setId(packet.getId());
+            ctx.writeAndFlush(endPacket);
         }catch (Exception e){
             e.printStackTrace();
             NetworkPacket errorPacket = NetworkPacket.builder().type(PacketTypes.ERROR).id(packet.getId()).content(e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET)).build();

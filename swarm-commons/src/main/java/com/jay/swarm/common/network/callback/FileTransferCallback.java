@@ -10,8 +10,6 @@ package com.jay.swarm.common.network.callback;
  **/
 public interface FileTransferCallback {
 
-    String getFilePath();
-
     default void onProgress(String fileId, long total, long current, float progress){
 
     }
