@@ -5,9 +5,12 @@ import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.StorageInfo;
 import io.netty.channel.Channel;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -32,6 +35,13 @@ public class StorageManager {
 
     public StorageManager(Config config) {
         this.config = config;
+    }
+
+    public List<StorageInfo> listAliveNodes(){
+        return storages.values().stream()
+                .filter(storage -> {
+                    return System.currentTimeMillis() - storage.getLastHeartBeatTime() < SwarmConstants.DEFAULT_HEARTBEAT_PERIOD;
+                }).collect(Collectors.toList());
     }
 
     /**

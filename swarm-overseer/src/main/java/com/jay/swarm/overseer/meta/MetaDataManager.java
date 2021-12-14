@@ -48,4 +48,8 @@ public class MetaDataManager {
         metaCache.put(metaData.getKey(), metaData);
     }
 
+    public MetaData getMetaData(String fileId){
+        return metaCache.get(fileId);
+    }
+
 }

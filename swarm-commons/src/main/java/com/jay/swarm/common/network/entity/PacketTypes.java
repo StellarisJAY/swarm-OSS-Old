@@ -47,8 +47,15 @@ public class PacketTypes {
      */
     public static final short DOWNLOAD_REQUEST = (short)8;
 
-    public static final short TRANSFER_FILE_HEAD_D = (short)9;
+    public static final short GET_META = (short)9;
 
-    public static final short ERROR = (short)10;
+    public static final short UPLOAD_REQUEST = (short)10;
+    public static final short UPLOAD_RESPONSE = (short) 11;
+    public static final short DELETE_META = (short)12;
+
+
+    public static final short SUCCESS = (short)20;
+    public static final short FAIL = (short)21;
+    public static final short ERROR = (short)22;
 
 }

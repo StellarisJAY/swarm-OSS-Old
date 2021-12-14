@@ -2,6 +2,8 @@ package com.jay.swarm.client;
 
 import com.jay.swarm.client.handler.SwarmClientHandler;
 import com.jay.swarm.common.constants.SwarmConstants;
+import com.jay.swarm.common.entity.FileUploadRequest;
+import com.jay.swarm.common.entity.FileUploadResponse;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.ShardedFileSender;
@@ -67,11 +69,36 @@ public class SwarmClient {
         callback.onComplete(fileId, (System.currentTimeMillis() - uploadStart), file.length());
     }
 
+
+    public void uploadMeta(String path) throws ExecutionException, InterruptedException {
+        this.client.connect("127.0.0.1", 9090);
+        File file = new File(path);
+        byte[] md5 = FileUtil.md5(path);
+        FileUploadRequest request = FileUploadRequest.builder().filename(file.getName()).size(file.length()).md5(md5).backupCount(1).build();
+        NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.UPLOAD_REQUEST, serializer.serialize(request, FileUploadRequest.class));
+        CompletableFuture<Object> future = this.client.sendAsync(packet);
+        NetworkPacket response = (NetworkPacket) future.get();
+        short type = response.getType();
+        if(type == PacketTypes.ERROR){
+            System.out.println(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));
+        }
+        else{
+            byte[] content = response.getContent();
+            FileUploadResponse uploadResponse = serializer.deserialize(content, FileUploadResponse.class);
+            System.out.println(uploadResponse);
+        }
+    }
+
     public void download(String fileId) throws ExecutionException, InterruptedException {
         this.client.connect("127.0.0.1", 9999);
         NetworkPacket downloadRequest = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
         CompletableFuture<Object> future = this.client.sendAsync(downloadRequest);
         NetworkPacket response = (NetworkPacket)future.get();
-        System.out.println(response);
+
+    }
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        SwarmClient swarmClient = new SwarmClient();
+        swarmClient.uploadMeta("D:/01.pdf");
     }
 }

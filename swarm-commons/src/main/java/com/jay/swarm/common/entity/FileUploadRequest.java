@@ -4,33 +4,20 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
-import java.util.List;
-
 /**
  * <p>
  *
  * </p>
  *
  * @author Jay
- * @date 2021/12/09 15:05
+ * @date 2021/12/14 19:59
  */
 @Builder
-@ToString
 @Getter
-public class MetaData {
-    private String key;
-
+@ToString
+public class FileUploadRequest {
     private String filename;
-
-    private long uploadTime;
-
     private long size;
-
-    private int backupCount;
-
     private byte[] md5;
-
-    private List<String> storages;
-
-
+    private int backupCount;
 }

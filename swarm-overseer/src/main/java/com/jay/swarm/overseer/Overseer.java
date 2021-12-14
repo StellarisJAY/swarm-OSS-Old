@@ -2,6 +2,8 @@ package com.jay.swarm.overseer;
 
 import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.network.BaseServer;
+import com.jay.swarm.common.serialize.ProtoStuffSerializer;
+import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.overseer.handler.PacketHandler;
 import com.jay.swarm.overseer.meta.MetaDataManager;
 import com.jay.swarm.overseer.meta.Persistence;
@@ -40,10 +42,13 @@ public class Overseer {
      */
     private final StorageManager storageManager;
 
+    private final Serializer serializer;
+
     private final Config config;
 
     public Overseer(Config config) {
         this.config = config;
+        this.serializer = new ProtoStuffSerializer();
         metaDataManager = new MetaDataManager();
         storageManager = new StorageManager(config);
         overseerServer = new BaseServer();
@@ -62,7 +67,7 @@ public class Overseer {
         }
         printBanner();
         // 添加Handler
-        overseerServer.addHandler(new PacketHandler(storageManager, metaDataManager));
+        overseerServer.addHandler(new PacketHandler(storageManager, metaDataManager, serializer));
         // 启动持久化任务
         persistence.init(30 * 1000);
         // 开启Overseer服务器
