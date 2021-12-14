@@ -6,7 +6,7 @@ import lombok.ToString;
 
 /**
  * <p>
- *
+ *  文件信息实体
  * </p>
  *
  * @author Jay
@@ -16,11 +16,23 @@ import lombok.ToString;
 @Getter
 @ToString
 public class FileInfo {
+    /**
+     * ID
+     */
     private String fileId;
 
+    /**
+     * 大小
+     */
     private long totalSize;
 
+    /**
+     * md5校验码
+     */
     private byte[] md5;
 
+    /**
+     * 分片数量
+     */
     private int shardCount;
 }

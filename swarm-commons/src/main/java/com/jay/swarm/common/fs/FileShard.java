@@ -6,7 +6,7 @@ import lombok.ToString;
 
 /**
  * <p>
- *
+ *  文件分片实体
  * </p>
  *
  * @author Jay
@@ -16,6 +16,12 @@ import lombok.ToString;
 @Getter
 @ToString
 public class FileShard {
+    /**
+     * 文件ID
+     */
     private String fileId;
+    /**
+     * 分片内容
+     */
     private byte[] content;
 }

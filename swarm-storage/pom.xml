@@ -41,7 +41,7 @@
                     <!-- 配置主程序-->
                     <archive>
                         <manifest>
-                            <mainClass>com.jay.swarm.storageInfo.StorageNode</mainClass>
+                            <mainClass>com.jay.swarm.storage.StorageNode</mainClass>
                         </manifest>
                     </archive>
                     <!-- 生成对应后缀的jar包 为加入依赖的jar-->
