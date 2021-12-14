@@ -119,6 +119,7 @@ public class FileAppender {
         }
         // 触发传输完成回调
         transferCallback.onComplete(fileId, (System.currentTimeMillis() - transferStartTime), receivedSize);
+        release();
     }
 
 
