@@ -3,6 +3,7 @@ package com.jay.swarm.common.network.handler;
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.fs.FileAppender;
 import com.jay.swarm.common.fs.FileInfo;
+import com.jay.swarm.common.fs.FileInfoCache;
 import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.fs.locator.FileLocator;
 import com.jay.swarm.common.fs.locator.Md5FileLocator;
@@ -10,6 +11,7 @@ import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
+import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -34,20 +36,22 @@ public class FileTransferHandler {
      */
     private final Map<String, FileAppender> appenderMap = new HashMap<>(256);
 
+    private final FileInfoCache fileInfoCache;
     /**
      * 存储基础目录
      */
     private final String baseDir;
 
-    public FileTransferHandler(String baseDir) {
+    public FileTransferHandler(String baseDir, FileInfoCache fileInfoCache) {
         this.baseDir = baseDir;
+        this.fileInfoCache = fileInfoCache;
     }
 
     /**
      * 处理文件传输报文
      * @param packet NetworkPacket
      */
-    public void handle(NetworkPacket packet){
+    public void handle(ChannelHandlerContext context, NetworkPacket packet){
         try{
             switch(packet.getType()){
                 case PacketTypes.TRANSFER_FILE_HEAD: handleTransferHead(packet);break;
@@ -57,11 +61,17 @@ public class FileTransferHandler {
             }
         }catch (Exception e){
             log.error("file transfer error: " ,e);
+            NetworkPacket errorResponse = NetworkPacket.buildPacketOfType(PacketTypes.ERROR, e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET));
+            errorResponse.setId(packet.getId());
+            context.channel().writeAndFlush(errorResponse);
         }finally {
             if(packet != null && packet.getType() == PacketTypes.TRANSFER_FILE_END){
                 String id = new String(packet.getContent(), SwarmConstants.DEFAULT_CHARSET);
                 FileAppender appender = appenderMap.remove(id);
                 appender.release();
+                NetworkPacket response = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_RESPONSE, null);
+                response.setId(packet.getId());
+                context.channel().writeAndFlush(response);
             }
         }
     }
@@ -76,7 +86,8 @@ public class FileTransferHandler {
         Serializer serializer = new ProtoStuffSerializer();
         // 反序列化出文件信息
         FileInfo fileInfo = serializer.deserialize(content, FileInfo.class);
-
+        // 文件信息缓存
+        fileInfoCache.saveFileInfo(fileInfo);
         log.info("received file transfer HEAD: {}", fileInfo);
         // 为文件分配目录
         FileLocator locator = new Md5FileLocator(baseDir);
