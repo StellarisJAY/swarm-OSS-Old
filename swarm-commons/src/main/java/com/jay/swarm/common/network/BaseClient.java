@@ -8,6 +8,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -27,9 +28,9 @@ public class BaseClient {
     private final BaseChannelInitializer channelInitializer = new BaseChannelInitializer();
     private final EventLoopGroup group = new NioEventLoopGroup();
     private Channel channel;
-    private ResponseWaitSet responseWaitSet = new ResponseWaitSet();
+    private final ResponseWaitSet responseWaitSet = new ResponseWaitSet();
 
-    private AtomicInteger idProvider = new AtomicInteger(1);
+    private final AtomicInteger idProvider = new AtomicInteger(1);
 
 
     public BaseClient() {
@@ -43,7 +44,7 @@ public class BaseClient {
         channelInitializer.addHandlers(handlers);
     }
 
-    public void connect(String host, int port){
+    public void connect(String host, int port) throws ConnectException {
         try{
             Bootstrap bootstrap = new Bootstrap()
                     .group(group)
@@ -54,7 +55,9 @@ public class BaseClient {
             ChannelFuture channelFuture = bootstrap.connect().sync();
             channel = channelFuture.channel();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            group.shutdownGracefully();
+            log.info("connection refused {}", host + ":" + port);
+            throw new ConnectException("connection refused by " + host + ":" + port);
         }
     }
 

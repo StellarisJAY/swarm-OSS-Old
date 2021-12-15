@@ -1,16 +1,22 @@
 package com.jay.swarm.overseer.meta;
 
+import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.entity.MetaData;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
+import com.jay.swarm.common.util.AppendableByteArray;
 import com.jay.swarm.common.util.ScheduleUtil;
+import com.jay.swarm.common.util.StringUtils;
+import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -29,47 +35,112 @@ import java.util.concurrent.TimeUnit;
 public class Persistence {
 
     private final MetaDataManager metaDataManager;
-
-    public Persistence(MetaDataManager metaDataManager) {
+    /**
+     * 默认的持久化周期10s，强烈建议根据实际情况配置持久化周期，避免文件信息丢失
+     */
+    private static final long DEFAULT_PERSISTENCE_PERIOD = 10000;
+    /**
+     * 默认的持久化文件
+     */
+    private static final String DEFAULT_PERSISTENCE_PATH = "D:/swarm/meta-data.dump";
+    private final Config config;
+    private final Serializer serializer;
+    public Persistence(MetaDataManager metaDataManager, Config config, Serializer serializer) {
         this.metaDataManager = metaDataManager;
+        this.config = config;
+        this.serializer = serializer;
     }
 
     /**
      * 开启持久化任务
-     * @param time 时间周期
      */
-    public void init(long time){
+    public void init(){
+        long initStart = System.currentTimeMillis();
+        long time;
+        // 读取持久化周期
+        String period = config.get("persistence.time");
+        if(StringUtils.isEmpty(period) || !period.matches("^[0-9]*$")){
+            time = DEFAULT_PERSISTENCE_PERIOD;
+        }else{
+            time = Long.parseLong(period);
+        }
+        String filePath = config.get("persistence.path");
+        if(filePath == null){
+            filePath = DEFAULT_PERSISTENCE_PATH;
+        }
+        // 启动时读取持久化文件
+        int countMeta = loadPersistence(filePath);
         // 定时任务
+        String finalFilePath = filePath;
         ScheduleUtil.scheduleAtFixedRate(()->{
             long perStart = System.currentTimeMillis();
             // 获取当前元数据缓存的快照副本
             List<MetaData> metaData = metaDataManager.copyOfCache();
             // 持久化副本
-            metaDataPersistence(metaData);
+            metaDataPersistence(metaData, finalFilePath);
             log.info("metadata saved, time used: {} ms", (System.currentTimeMillis() - perStart));
         }, time,  time, TimeUnit.MILLISECONDS);
+        log.info("persistence init finished, loaded {} meta-data time used: {} ms", countMeta, (System.currentTimeMillis() - initStart));
+    }
+
+    /**
+     * 加载持久化数据
+     * @param path 持久化文件路径
+     */
+    private int loadPersistence(String path){
+        File file = new File(path);
+        int loaded = 0;
+        // 文件存在，如果不存在表示是第一次启动，不用加载数据
+        if(file.exists() && !file.isDirectory()){
+            try(FileInputStream inputStream = new FileInputStream(file)){
+                // channel
+                FileChannel channel = inputStream.getChannel();
+                // 分配buffer，大小为文件大小
+                ByteBuffer buffer = ByteBuffer.allocate((int)file.length());
+                int length = channel.read(buffer);
+                buffer.rewind();
+                AppendableByteArray byteArray = new AppendableByteArray();
+                while(length > 0){
+                    byte b = buffer.get();
+                    if(b == (byte)'\r'){
+                        // 读取一行字节
+                        byte[] serialized = byteArray.array();
+                        // 反序列化
+                        MetaData metaData = serializer.deserialize(serialized, MetaData.class);
+                        metaDataManager.putMetaData(metaData);
+                        loaded++;
+                        byteArray.flush();
+                    }else{
+                        byteArray.append(b);
+                    }
+                    length--;
+                }
+                channel.close();
+                buffer.clear();
+            }catch (IOException e){
+                throw new RuntimeException("unable to load persistence file");
+            }
+        }
+        return loaded;
     }
 
     /**
      * 持久化过程
      * @param metaData 元数据集合
      */
-    private void metaDataPersistence(List<MetaData> metaData){
-        File file = new File("D:/meta-data.dump");
+    private void metaDataPersistence(List<MetaData> metaData, String path){
+        File file = new File(path);
         try(FileOutputStream outputStream = new FileOutputStream(file)){
             // channel
             FileChannel channel = outputStream.getChannel();
-            // 序列化工具
-            Serializer serializer = new ProtoStuffSerializer();
             // 每个metaData序列化后写入文件
             for(MetaData meta : metaData){
                 // 序列化
                 byte[] serialized = serializer.serialize(meta, MetaData.class);
                 // 创建buffer，大小为序列化后字节数 + 换行符
-                ByteBuffer buffer = ByteBuffer.allocate(serialized.length + 2);
+                ByteBuffer buffer = ByteBuffer.allocate(serialized.length + 1);
                 buffer.put(serialized);
                 buffer.put((byte)'\r');
-                buffer.put((byte)'\n');
                 buffer.rewind();
                 // 写入channel
                 channel.write(buffer);

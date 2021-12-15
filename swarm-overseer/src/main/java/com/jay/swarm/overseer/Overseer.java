@@ -52,7 +52,7 @@ public class Overseer {
         metaDataManager = new MetaDataManager();
         storageManager = new StorageManager(config);
         overseerServer = new BaseServer();
-        persistence = new Persistence(metaDataManager);
+        persistence = new Persistence(metaDataManager, config, serializer);
     }
 
     /**
@@ -69,7 +69,7 @@ public class Overseer {
         // 添加Handler
         overseerServer.addHandler(new PacketHandler(storageManager, metaDataManager, serializer));
         // 启动持久化任务
-        persistence.init(30 * 1000);
+        persistence.init();
         // 开启Overseer服务器
         overseerServer.bind(Integer.parseInt(port));
         log.info("Overseer server started, listening port {}", port);
@@ -94,8 +94,10 @@ public class Overseer {
     }
 
     public static void main(String[] args) {
-        Overseer overseer = new Overseer(new Config("D:/overseer.properties"));
+        if(args.length < 1){
+            throw new IllegalArgumentException("no enough args to start overseer node");
+        }
+        Overseer overseer = new Overseer(new Config(args[0]));
         overseer.init();
     }
-
 }
