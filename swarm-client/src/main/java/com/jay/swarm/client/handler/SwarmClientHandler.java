@@ -7,6 +7,7 @@ import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.Serializer;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
@@ -16,15 +17,18 @@ import java.io.IOException;
 
 /**
  * <p>
- *
+ *  SWARM标准客户端处理器
  * </p>
  *
  * @author Jay
  * @date 2021/12/14 14:19
  */
 @Slf4j
+@ChannelHandler.Sharable
 public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacket> {
-
+    /**
+     * 文件传输处理器
+     */
     private final FileTransferHandler fileTransferHandler;
     private final Serializer serializer;
     private final String baseDir;
@@ -49,9 +53,6 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
             if(log.isDebugEnabled()){
                 log.debug("client handler error", e);
             }
-            NetworkPacket errorResponse = NetworkPacket.buildPacketOfType(PacketTypes.ERROR, e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET));
-            errorResponse.setId(packet.getId());
-            channelHandlerContext.channel().writeAndFlush(errorResponse);
         }
     }
 
