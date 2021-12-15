@@ -9,7 +9,6 @@ import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.ShardedFileSender;
-import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
@@ -22,12 +21,12 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * <p>
- *
+ *  SWARM-DFS 客户端
+ *  使用该客户端对象向SWARM存储系统发送命令
  * </p>
  *
  * @author Jay
@@ -49,6 +48,13 @@ public class SwarmClient {
         this.client.addHandler(clientHandler);
     }
 
+    /**
+     * 上传文件
+     * @param path 路径
+     * @param callback 上传过程回调
+     * @return 文件ID
+     * @throws Exception Exception
+     */
     public String upload(String path, FileTransferCallback callback) throws Exception {
         try{
             // 向Overseer发送上传请求，获得overseer返回的存储节点和fileId
@@ -66,7 +72,7 @@ public class SwarmClient {
             List<StorageInfo> storages = fileUploadResponse.getStorageNodes();
 
             // 向storage发送文件
-            NetworkPacket uploadFileResponse = uploadFile(path, fileId, storages, callback);
+            NetworkPacket uploadFileResponse = uploadFileData(path, fileId, storages, callback);
 
             // storageNode返回错误
             if(uploadFileResponse.getType() == PacketTypes.ERROR){
@@ -83,7 +89,16 @@ public class SwarmClient {
         }
     }
 
-    public NetworkPacket uploadFile(String path, String fileId, List<StorageInfo> storages, FileTransferCallback callback) throws Exception {
+    /**
+     * 发送文件数据到StorageNode
+     * @param path 路径
+     * @param fileId 文件ID
+     * @param storages 目标存储节点
+     * @param callback 回调
+     * @return response NetworkPacket
+     * @throws Exception Exception
+     */
+    public NetworkPacket uploadFileData(String path, String fileId, List<StorageInfo> storages, FileTransferCallback callback) throws Exception {
         StorageInfo storageInfo = storages.get(0);
         this.client.connect(storageInfo.getHost(), storageInfo.getPort());
         // 上传文件开始时间
@@ -116,6 +131,12 @@ public class SwarmClient {
     }
 
 
+    /**
+     * 上传文件元数据到Overseer
+     * @param path 路径
+     * @return response NetworkPacket
+     * @throws Exception Exception
+     */
     public NetworkPacket uploadMeta(String path) throws Exception {
         String host = config.get("overseer.host");
         String port = config.get("overseer.port");
@@ -134,19 +155,5 @@ public class SwarmClient {
         // 发送上传请求，并等待结果
         CompletableFuture<Object> future = this.client.sendAsync(packet);
         return (NetworkPacket) future.get();
-    }
-
-    public void download(String fileId) throws Exception {
-        this.client.connect("127.0.0.1", 9999);
-        NetworkPacket downloadRequest = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
-        CompletableFuture<Object> future = this.client.sendAsync(downloadRequest);
-        NetworkPacket response = (NetworkPacket)future.get();
-
-    }
-
-    public static void main(String[] args) throws Exception {
-        Config config = new Config("D:/client.properties");
-        SwarmClient swarmClient = new SwarmClient(config);
-        swarmClient.upload("D:/01.pdf", new DefaultFileTransferCallback());
     }
 }

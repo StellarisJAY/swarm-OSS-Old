@@ -14,6 +14,7 @@ import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.common.util.ScheduleUtil;
+import com.jay.swarm.common.util.StringUtils;
 import com.jay.swarm.storage.handler.FileDownloadHandler;
 import com.jay.swarm.storage.handler.StorageNodeHandler;
 import lombok.extern.slf4j.Slf4j;
@@ -45,17 +46,22 @@ public class StorageNode {
     private final String host;
     private final int port;
     private final FileInfoCache fileInfoCache;
-
-    private static final String STORAGE_PATH = "D:/storage";
+    private final String STORAGE_PATH;
+    private static final String DEFAULT_STORAGE_PATH = "D:/storage";
 
     public StorageNode(Config config) throws UnknownHostException {
+        this.config = config;
+        // 配置文件加载存储根目录
+        String storagePath = config.get("storage.root");
+        this.STORAGE_PATH = StringUtils.isEmpty(storagePath) ? DEFAULT_STORAGE_PATH : storagePath;
         // 生成节点ID
         this.nodeId = UUID.randomUUID().toString();
         client = new BaseClient();
         server = new BaseServer();
+        // 默认序列化工具
         Serializer serializer = new ProtoStuffSerializer();
         // 文件定位器
-        FileLocator locator = new Md5FileLocator(STORAGE_PATH);
+        FileLocator locator = new Md5FileLocator(this.STORAGE_PATH);
         // 文件信息缓存
         fileInfoCache = new FileInfoCache(locator);
         // 传输处理器
@@ -64,7 +70,7 @@ public class StorageNode {
         FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
         // 服务器添加存储节点处理器
         server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client));
-        this.config = config;
+
 
         // 节点地址
         host = InetAddress.getLocalHost().getHostAddress();
@@ -110,7 +116,7 @@ public class StorageNode {
      * 检查存储目录，如果不存在将自动创建
      */
     public void checkStoragePath() {
-        File file = new File(STORAGE_PATH);
+        File file = new File(DEFAULT_STORAGE_PATH);
         if(!file.exists() && !file.mkdirs()){
             throw new RuntimeException("unable to mkdir");
         }
@@ -173,7 +179,7 @@ public class StorageNode {
      * @return byte[]
      */
     private byte[] getStorageInfo(){
-        File storageDir = new File(STORAGE_PATH);
+        File storageDir = new File(DEFAULT_STORAGE_PATH);
         StorageInfo storageInfo = StorageInfo.builder().host(host)
                 .port(port)
                 .usedStorage(storageDir.getTotalSpace())
@@ -202,7 +208,11 @@ public class StorageNode {
     }
 
     public static void main(String[] args) throws Exception {
-        Config config = new Config("D:/storage.properties");
+        if(args.length < 1){
+            throw new RuntimeException("no enough args to start storage node");
+        }
+        // arg[0] 作为配置文件路径
+        Config config = new Config(args[0]);
         StorageNode storageNode = new StorageNode(config);
         storageNode.init();
     }

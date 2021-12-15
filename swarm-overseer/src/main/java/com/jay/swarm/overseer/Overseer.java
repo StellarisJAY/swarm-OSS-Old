@@ -69,7 +69,7 @@ public class Overseer {
         // 添加Handler
         overseerServer.addHandler(new PacketHandler(storageManager, metaDataManager, serializer));
         // 启动持久化任务
-        persistence.init(30 * 1000);
+        persistence.init();
         // 开启Overseer服务器
         overseerServer.bind(Integer.parseInt(port));
         log.info("Overseer server started, listening port {}", port);

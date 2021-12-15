@@ -6,6 +6,7 @@ import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.common.util.AppendableByteArray;
 import com.jay.swarm.common.util.ScheduleUtil;
+import com.jay.swarm.common.util.StringUtils;
 import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,6 +35,13 @@ import java.util.concurrent.TimeUnit;
 public class Persistence {
 
     private final MetaDataManager metaDataManager;
+    /**
+     * 默认的持久化周期10s，强烈建议根据实际情况配置持久化周期，避免文件信息丢失
+     */
+    private static final long DEFAULT_PERSISTENCE_PERIOD = 10000;
+    /**
+     * 默认的持久化文件
+     */
     private static final String DEFAULT_PERSISTENCE_PATH = "D:/swarm/meta-data.dump";
     private final Config config;
     private final Serializer serializer;
@@ -45,11 +53,17 @@ public class Persistence {
 
     /**
      * 开启持久化任务
-     * @param time 时间周期
      */
-    public void init(long time){
+    public void init(){
         long initStart = System.currentTimeMillis();
-
+        long time;
+        // 读取持久化周期
+        String period = config.get("persistence.time");
+        if(StringUtils.isEmpty(period) || !period.matches("^[0-9]*$")){
+            time = DEFAULT_PERSISTENCE_PERIOD;
+        }else{
+            time = Long.parseLong(period);
+        }
         String filePath = config.get("persistence.path");
         if(filePath == null){
             filePath = DEFAULT_PERSISTENCE_PATH;
