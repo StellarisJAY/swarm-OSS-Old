@@ -19,7 +19,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * <p>
- *
+ *  文件分片发送器
+ *  将文件分片后发送
  * </p>
  *
  * @author Jay
@@ -54,10 +55,15 @@ public class ShardedFileSender {
         long sentLength = 0;
         try(FileInputStream inputStream = new FileInputStream(file)){
             FileChannel fileChannel = inputStream.getChannel();
+            // 分配buffer，大小为默认的分片大小
             ByteBuffer shardBuffer = ByteBuffer.allocate(SwarmConstants.DEFAULT_SHARD_SIZE);
             int length;
             while((length = fileChannel.read(shardBuffer)) != -1){
+                // 已发送的大小
                 sentLength += length;
+                /*
+                    需要优化，过多堆内外拷贝
+                 */
                 byte[] shardContent = new byte[length];
                 shardBuffer.rewind();
                 shardBuffer.get(shardContent);
