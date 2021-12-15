@@ -49,6 +49,8 @@ public class StorageNode {
     private static final String STORAGE_PATH = "D:/storage";
 
     public StorageNode(Config config) throws UnknownHostException {
+        // 生成节点ID
+        this.nodeId = UUID.randomUUID().toString();
         client = new BaseClient();
         server = new BaseServer();
         Serializer serializer = new ProtoStuffSerializer();
@@ -61,10 +63,9 @@ public class StorageNode {
         // 下载处理器
         FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
         // 服务器添加存储节点处理器
-        server.addHandler(new StorageNodeHandler(transferHandler, downloadHandler, locator, serializer));
+        server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client));
         this.config = config;
-        // 生成节点ID
-        this.nodeId = UUID.randomUUID().toString();
+
         // 节点地址
         host = InetAddress.getLocalHost().getHostAddress();
         port = Integer.parseInt(config.get("server.port"));

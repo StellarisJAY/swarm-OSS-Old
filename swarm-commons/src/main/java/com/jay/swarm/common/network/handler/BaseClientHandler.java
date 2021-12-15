@@ -2,6 +2,7 @@ package com.jay.swarm.common.network.handler;
 
 import com.jay.swarm.common.network.ResponseWaitSet;
 import com.jay.swarm.common.network.entity.NetworkPacket;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
@@ -13,6 +14,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
  * @author Jay
  * @date 2021/12/09 16:19
  */
+@ChannelHandler.Sharable
 public class BaseClientHandler extends SimpleChannelInboundHandler<NetworkPacket> {
     private final ResponseWaitSet responseWaitSet;
 
