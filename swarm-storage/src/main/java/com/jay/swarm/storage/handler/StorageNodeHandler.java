@@ -1,10 +1,12 @@
 package com.jay.swarm.storage.handler;
 
 import com.jay.swarm.common.constants.SwarmConstants;
+import com.jay.swarm.common.entity.FileMetaStorage;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.fs.locator.FileLocator;
 import com.jay.swarm.common.fs.locator.Md5FileLocator;
+import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
@@ -38,12 +40,16 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
     private final FileDownloadHandler downloadHandler;
     private final FileLocator locator;
     private final Serializer serializer;
+    private final BaseClient overseerClient;
+    private final String storageNodeId;
 
-    public StorageNodeHandler(FileTransferHandler fileTransferHandler, FileDownloadHandler downloadHandler, FileLocator locator, Serializer serializer) {
+    public StorageNodeHandler(String storageNodeId, FileTransferHandler fileTransferHandler, FileDownloadHandler downloadHandler, FileLocator locator, Serializer serializer, BaseClient overseerClient) {
         this.fileTransferHandler = fileTransferHandler;
         this.downloadHandler = downloadHandler;
         this.locator = locator;
         this.serializer = serializer;
+        this.overseerClient = overseerClient;
+        this.storageNodeId = storageNodeId;
     }
 
     @Override
@@ -74,6 +80,7 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
                 default:break;
             }
         }catch (Exception e){
+            log.error("channel read error: ", e);
             NetworkPacket errorResponse = NetworkPacket.buildPacketOfType(PacketTypes.ERROR, e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET));
             errorResponse.setId(packet.getId());
             channelHandlerContext.channel().writeAndFlush(errorResponse);
@@ -85,25 +92,36 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         byte[] content = packet.getContent();
         FileInfo fileInfo = serializer.deserialize(content, FileInfo.class);
         String path = locator.locate(fileInfo.getFileId());
-        log.info("received head pid:{}", packet.getId());
         fileTransferHandler.handleTransferHead(fileInfo, path);
         NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
         context.channel().writeAndFlush(response);
     }
 
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
+        // 反序列化分片
         byte[] content = packet.getContent();
         FileShard shard = serializer.deserialize(content, FileShard.class);
+        // 处理分片
         fileTransferHandler.handleTransferBody(shard);
+        // 回复报文
         NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
         context.channel().writeAndFlush(response);
     }
 
-    private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet){
+    private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet) throws Exception{
         byte[] content = packet.getContent();
         String fileId = new String(content, SwarmConstants.DEFAULT_CHARSET);
         fileTransferHandler.handleTransferEnd(fileId);
-        NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
+
+        // 向Overseer通知存储文件结果，文件ID，节点ID
+        FileMetaStorage fileMetaStorage = FileMetaStorage.builder()
+                .storageId(storageNodeId).fileId(fileId).build();
+        NetworkPacket noticeOverseer = NetworkPacket.buildPacketOfType(PacketTypes.UPDATE_FILE_META_STORAGE, serializer.serialize(fileMetaStorage, FileMetaStorage.class));
+        // 等待Overseer的回复
+        NetworkPacket overseerResp = (NetworkPacket) overseerClient.sendAsync(noticeOverseer).get();
+        NetworkPacket response = NetworkPacket.buildPacketOfType(overseerResp.getType(), overseerResp.getContent());
+        response.setId(packet.getId());
+        // 向客户端的回复
         context.channel().writeAndFlush(response);
     }
 }

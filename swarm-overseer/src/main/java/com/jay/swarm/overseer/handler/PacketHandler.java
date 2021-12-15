@@ -1,14 +1,11 @@
 package com.jay.swarm.overseer.handler;
 
-import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
-import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.overseer.meta.MetaDataManager;
 import com.jay.swarm.overseer.storage.StorageManager;
 import com.jay.swarm.overseer.storage.StorageNodeSelector;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -29,14 +26,11 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
 
     private final StorageHandler storageHandler;
     private final MetaDataHandler metaDataHandler;
-    private final MetaDataManager metaDataManager;
-    private final StorageNodeSelector storageNodeSelector;
 
     public PacketHandler(StorageManager storageManager, MetaDataManager metaDataManager, Serializer serializer) {
         this.storageHandler = new StorageHandler(storageManager, serializer);
-        this.storageNodeSelector = new StorageNodeSelector(storageManager);
-        this.metaDataManager = metaDataManager;
-        this.metaDataHandler = new MetaDataHandler(metaDataManager, serializer, storageNodeSelector);
+        StorageNodeSelector storageNodeSelector = new StorageNodeSelector(storageManager);
+        this.metaDataHandler = new MetaDataHandler(metaDataManager, storageManager, serializer, storageNodeSelector);
     }
 
     @Override
@@ -63,6 +57,8 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
             case PacketTypes.HEART_BEAT: response = storageHandler.handleStorageHeartBeat(packet); break;
             // 上传请求
             case PacketTypes.UPLOAD_REQUEST: response = metaDataHandler.handleUploadRequest(packet); break;
+            // 更新meta
+            case PacketTypes.UPDATE_FILE_META_STORAGE: response = metaDataHandler.updateFileMeta(packet); break;
             default:break;
         }
         if(response != null){

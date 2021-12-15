@@ -51,7 +51,12 @@ public class PacketTypes {
 
     public static final short UPLOAD_REQUEST = (short)10;
     public static final short UPLOAD_RESPONSE = (short) 11;
-    public static final short DELETE_META = (short)12;
+
+    /**
+     * 更新文件元数据中的存储节点
+     * 在客户端传输文件到存储节点结束后，存储节点用该报文通知Overseer我保存了某文件的副本
+     */
+    public static final short UPDATE_FILE_META_STORAGE = (short)12;
 
 
     public static final short SUCCESS = (short)20;

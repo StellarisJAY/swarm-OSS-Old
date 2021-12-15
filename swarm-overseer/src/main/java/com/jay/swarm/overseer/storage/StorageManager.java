@@ -44,6 +44,10 @@ public class StorageManager {
                 }).collect(Collectors.toList());
     }
 
+    public StorageInfo getStorageInfo(String storageId){
+        return storages.get(storageId);
+    }
+
     /**
      * 注册存储节点，且保存该节点的channel
      * 该方法在收到某个节点发送的注册报文后调用
