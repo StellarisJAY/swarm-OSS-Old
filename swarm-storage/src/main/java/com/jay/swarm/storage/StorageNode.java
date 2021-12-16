@@ -20,9 +20,8 @@ import com.jay.swarm.storage.handler.StorageNodeHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
-import java.net.InetAddress;
+import java.net.Inet4Address;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -72,7 +71,7 @@ public class StorageNode {
 
 
         // 节点地址
-        host = InetAddress.getLocalHost().getHostAddress();
+        host = Inet4Address.getLocalHost().getHostAddress();
         port = Integer.parseInt(config.get("server.port"));
     }
 
@@ -98,18 +97,16 @@ public class StorageNode {
 
             // 连接Overseer
             client.connect(host, Integer.parseInt(port));
+            log.info("successfully connected to Overseer Node at {}:{}", host, port);
             // 注册节点
             registerNode();
-
             // 开启心跳
             startHeartBeat();
-            log.info("successfully connected to Overseer Node at {}:{}", host, port);
-
             // 服务器添加存储节点处理器，开启服务器
             // 传输处理器
             FileTransferHandler transferHandler = new FileTransferHandler(fileInfoCache);
             // 下载处理器
-            FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
+            FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache, serializer);
             server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client, fileInfoCache));
             server.bind(Integer.parseInt(serverPort));
             log.info("Storage Node server started, listening: {}", serverPort);
@@ -164,6 +161,8 @@ public class StorageNode {
         }
     }
 
+
+
     private void saveNodeId(String nodeId) throws Exception{
         try(OutputStream outputStream = new FileOutputStream(DEFAULT_NODE_ID_PATH)){
             OutputStreamWriter out = new OutputStreamWriter(outputStream);
@@ -198,7 +197,7 @@ public class StorageNode {
                     等待Overseer的心跳回应
                  */
                 Object response = future.get(SwarmConstants.DEFAULT_HEARTBEAT_PERIOD, TimeUnit.MILLISECONDS);
-                log.info("heart-beat finished , status: {}", "success");
+                log.debug("heart-beat finished , status: {}", "success");
             } catch (ExecutionException | InterruptedException e) {
                 log.error("heart-beat ends with exception", e);
             } catch (TimeoutException e) {
@@ -249,7 +248,7 @@ public class StorageNode {
                 BufferedReader reader = new BufferedReader(inputStreamReader);
                 String line;
                 while((line = reader.readLine()) != null){
-                    System.out.println(line);
+                    System.out.format("\33[33;1m %s%n", line);
                 }
                 reader.close();
                 inputStreamReader.close();

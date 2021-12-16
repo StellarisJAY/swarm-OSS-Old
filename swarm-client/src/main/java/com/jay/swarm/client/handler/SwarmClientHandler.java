@@ -66,14 +66,12 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
         byte[] content = packet.getContent();
         FileShard shard = serializer.deserialize(content, FileShard.class);
-        log.info("received file body: {}", shard.getFileId());
         fileTransferHandler.handleTransferBody(shard);
     }
 
     private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet){
         byte[] content = packet.getContent();
         String fileId = new String(content, SwarmConstants.DEFAULT_CHARSET);
-        log.info("received file end: {}", fileId);
         fileTransferHandler.handleTransferEnd(fileId);
     }
 }

@@ -20,7 +20,8 @@ import java.util.List;
 
 /**
  * <p>
- *
+ *  Overseer网络入口处理器
+ *  负责将报文分类，然后交给相应的处理类处理
  * </p>
  *
  * @author Jay
@@ -29,10 +30,21 @@ import java.util.List;
 @ChannelHandler.Sharable
 @Slf4j
 public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
-
+    /**
+     *  存储节点处理器，处理存储节点的注册和心跳
+     */
     private final StorageHandler storageHandler;
+    /**
+     * 元数据处理器，负责处理操作元数据的报文
+     */
     private final MetaDataHandler metaDataHandler;
+    /**
+     * 元数据管理器
+     */
     private final MetaDataManager metaDataManager;
+    /**
+     * 存储节点管理器
+     */
     private final StorageManager storageManager;
     private final Serializer serializer;
 
@@ -40,6 +52,9 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
         this.metaDataManager = metaDataManager;
         this.storageManager = storageManager;
         this.storageHandler = new StorageHandler(storageManager, serializer);
+        /*
+            节点选择器，负责在上传时选择目标存储节点
+         */
         StorageNodeSelector storageNodeSelector = new StorageNodeSelector(storageManager);
         this.metaDataHandler = new MetaDataHandler(metaDataManager, storageManager, serializer, storageNodeSelector);
         this.serializer = serializer;
@@ -71,7 +86,7 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
             case PacketTypes.UPLOAD_REQUEST: response = metaDataHandler.handleUploadRequest(packet); break;
             // 更新meta
             case PacketTypes.UPDATE_FILE_META_STORAGE: response = metaDataHandler.updateFileMeta(packet); break;
-
+            // 下载请求
             case PacketTypes.DOWNLOAD_REQUEST: response = handleDownloadRequest(packet);break;
             default:break;
         }

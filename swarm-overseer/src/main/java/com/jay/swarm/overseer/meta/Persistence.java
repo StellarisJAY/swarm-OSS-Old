@@ -78,9 +78,9 @@ public class Persistence {
             List<MetaData> metaData = metaDataManager.copyOfCache();
             // 持久化副本
             metaDataPersistence(metaData, finalFilePath);
-            log.info("metadata saved, time used: {} ms", (System.currentTimeMillis() - perStart));
+            log.debug("metadata saved, time used: {} ms", (System.currentTimeMillis() - perStart));
         }, time,  time, TimeUnit.MILLISECONDS);
-        log.info("persistence init finished, loaded {} meta-data time used: {} ms", countMeta, (System.currentTimeMillis() - initStart));
+        log.debug("persistence init finished, loaded {} meta-data time used: {} ms", countMeta, (System.currentTimeMillis() - initStart));
     }
 
     /**

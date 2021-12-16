@@ -54,7 +54,7 @@ public class FileTransferHandler {
      */
     public void handleTransferHead(FileInfo fileInfo, String path) throws IOException {
         // 创建appender
-        FileAppender fileAppender = new FileAppender(fileInfo.getFileId(), path, fileInfo.getMd5(), fileInfo.getTotalSize(), fileInfo.getShardCount());
+        FileAppender fileAppender = new FileAppender(fileInfo.getFileId(), path, fileInfo.getMd5(), fileInfo.getTotalSize());
         appenderMap.put(fileInfo.getFileId(), fileAppender);
         // 缓存文件信息
         if(fileInfoCache != null){
@@ -72,7 +72,6 @@ public class FileTransferHandler {
 
 
     public void handleTransferEnd(String fileId){
-        log.info("received file transfer END: {}", fileId);
         // 拼接器complete
         FileAppender appender = appenderMap.remove(fileId);
         appender.complete();

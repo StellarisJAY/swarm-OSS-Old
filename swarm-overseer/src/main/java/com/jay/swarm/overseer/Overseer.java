@@ -81,9 +81,9 @@ public class Overseer {
             if(inputStream != null){
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
                 BufferedReader reader = new BufferedReader(inputStreamReader);
-                String line = null;
+                String line;
                 while((line = reader.readLine()) != null){
-                    System.out.println(line);
+                    System.out.format("\33[33;1m %s%n", line);
                 }
                 reader.close();
                 inputStreamReader.close();

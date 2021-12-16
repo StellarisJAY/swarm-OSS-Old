@@ -56,6 +56,7 @@ public class BaseClient {
             channel = channelFuture.channel();
         } catch (Exception e) {
             group.shutdownGracefully();
+            e.printStackTrace();
             if(log.isDebugEnabled()){
                 log.debug("connection refused {}", host + ":" + port);
             }
