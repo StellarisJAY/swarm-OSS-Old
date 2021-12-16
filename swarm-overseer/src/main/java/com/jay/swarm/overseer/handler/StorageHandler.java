@@ -9,7 +9,10 @@ import com.jay.swarm.overseer.storage.StorageManager;
 import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.Inet4Address;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 /**
  * <p>
@@ -36,11 +39,19 @@ public class StorageHandler {
             }
             // 反序列化报文content
             StorageInfo storageInfo = serializer.deserialize(content, StorageInfo.class);
+            InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
+            storageInfo.setHost(address.getHostString());
+            // 没有ID，第一次注册
+            if(storageInfo.getId() == null){
+                // 为节点分配ID
+                storageInfo.setId(UUID.randomUUID().toString());
+            }
             // 注册存储节点
             boolean status = storageManager.registerStorage(storageInfo, channel);
             log.info("node {} {}", channel.remoteAddress(), status ? "registered" : "failed to register");
-            String message = status ? "registered" : "Node ID already taken";
-            NetworkPacket response = NetworkPacket.buildPacketOfType(status ? PacketTypes.SUCCESS : PacketTypes.FAIL, message.getBytes(SwarmConstants.DEFAULT_CHARSET));
+
+            NetworkPacket response =  NetworkPacket.buildPacketOfType(status ? PacketTypes.SUCCESS : PacketTypes.ERROR,
+                    status ? storageInfo.getId().getBytes(SwarmConstants.DEFAULT_CHARSET) : "failed to register".getBytes(SwarmConstants.DEFAULT_CHARSET));
             response.setId(packet.getId());
             return response;
         }catch (Exception e){
@@ -53,13 +64,16 @@ public class StorageHandler {
         }
     }
 
-    public NetworkPacket handleStorageHeartBeat(NetworkPacket packet){
+    public NetworkPacket handleStorageHeartBeat(NetworkPacket packet, Channel channel){
         try{
             byte[] content = packet.getContent();
             if(content == null){
                 throw new RuntimeException("no content found in heart beat packet");
             }
             StorageInfo storageInfo = serializer.deserialize(content, StorageInfo.class);
+            InetSocketAddress remoteAddress = (InetSocketAddress) channel.remoteAddress();
+            storageInfo.setHost(remoteAddress.getHostString());
+
             storageManager.storageHeartBeat(storageInfo);
 
             return NetworkPacket.builder()

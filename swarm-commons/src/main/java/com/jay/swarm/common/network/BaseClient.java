@@ -56,7 +56,9 @@ public class BaseClient {
             channel = channelFuture.channel();
         } catch (Exception e) {
             group.shutdownGracefully();
-            log.info("connection refused {}", host + ":" + port);
+            if(log.isDebugEnabled()){
+                log.debug("connection refused {}", host + ":" + port);
+            }
             throw new ConnectException("connection refused by " + host + ":" + port);
         }
     }
@@ -69,5 +71,12 @@ public class BaseClient {
         });
 
         return result;
+    }
+
+    public void shutdown(){
+        if(channel != null){
+            channel.close();
+        }
+        group.shutdownGracefully();
     }
 }

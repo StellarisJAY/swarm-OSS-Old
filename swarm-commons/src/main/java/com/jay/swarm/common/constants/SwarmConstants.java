@@ -17,4 +17,6 @@ public class SwarmConstants {
     public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
     public static final int DEFAULT_SHARD_SIZE = 1024 * 1024 * 10;
+
+    public static final int BACKUP_SYNC_RETRY_TIMES = 3;
 }
