@@ -56,19 +56,13 @@ public class FileAppender {
      * 接收到的大小
      */
     private long receivedSize;
-
-    /**
-     * 分片个数
-     */
-    private final int shardCount;
     private final String path;
 
     private final long transferStartTime;
 
-    public FileAppender(String fileId, String path, byte[] fileMd5, long totalSize, int shardCount) throws IOException {
+    public FileAppender(String fileId, String path, byte[] fileMd5, long totalSize) throws IOException {
         this.fileMd5 = fileMd5;
         this.totalSize = totalSize;
-        this.shardCount = shardCount;
         this.fileId = fileId;
         this.path = path;
         this.transferCallback = new DefaultFileTransferCallback();

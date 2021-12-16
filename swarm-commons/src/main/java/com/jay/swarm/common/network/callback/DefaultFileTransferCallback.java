@@ -18,7 +18,7 @@ public class DefaultFileTransferCallback implements FileTransferCallback {
 
     @Override
     public void onProgress(String fileId, long total, long current, float progress) {
-        log.info("file {} transfer progress: {} %", fileId, progress);
+        log.debug("file {} transfer progress: {} %", fileId, progress);
     }
 
     @Override

@@ -94,38 +94,54 @@ public final class UploadHelper {
      * @throws Exception Exception
      */
     private NetworkPacket uploadFileData(String path, String fileId, List<StorageInfo> storages, FileTransferCallback callback) throws Exception {
-        // 选择目标存储节点
+        /*
+            选择目标存储节点
+            选择一个节点作为上传点，剩下的备份由storage节点间接力传递
+         */
         StorageInfo targetStorageNode = StorageNodeSelector.select(storages);
 
-        // 连接目标节点
+        // 连接 上传点
         this.client.connect(targetStorageNode.getHost(), targetStorageNode.getPort());
         // 上传文件开始时间
         long uploadStart = System.currentTimeMillis();
-        File file = new File(path);
+
         // 计算文件MD5
+        File file = new File(path);
         byte[] md5 = FileUtil.md5(path);
+
         // 封装文件信息，md5、ID、大小、分片个数
         FileInfo fileInfo = FileInfo.builder().fileId(fileId)
-                .md5(md5)
-                .totalSize(file.length())
+                .md5(md5).totalSize(file.length())
                 .shardCount((int) (file.length() / SwarmConstants.DEFAULT_SHARD_SIZE))
                 .build();
-        // 发送HEAD报文
-        NetworkPacket headPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, serializer.serialize(fileInfo, FileInfo.class));
+        /*
+            HEAD报文
+         */
+        byte[] headSerialized = serializer.serialize(fileInfo, FileInfo.class);
+        NetworkPacket headPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, headSerialized);
+        // 发送HEAD
         client.sendAsync(headPacket);
 
-        // 传输文件分片
+        /*
+            文件分片
+         */
         ShardedFileSender shardedFileSender = new ShardedFileSender(client, serializer, callback);
+        // 发送分片
         shardedFileSender.send(file, fileId);
 
-        // END 报文，包括剩下的节点
-        FileUploadEnd uploadEnd = FileUploadEnd.builder().fileId(fileId).otherStorages(storages).build();
-        NetworkPacket transferEnd = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END,
-                serializer.serialize(uploadEnd, FileUploadEnd.class));
-        // 发送END报文
-        CompletableFuture<Object> future = this.client.sendAsync(transferEnd);
-        // 等待结果
-        NetworkPacket response =  (NetworkPacket)future.get();
+        /*
+            END 报文
+         */
+        FileUploadEnd uploadEnd = FileUploadEnd.builder()
+                .fileId(fileId)
+                // 待备份的节点
+                .otherStorages(storages)
+                .build();
+        // 序列化、封装END报文
+        byte[] endSerialized = serializer.serialize(uploadEnd, FileUploadEnd.class);
+        NetworkPacket transferEnd = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, endSerialized);
+        // 发送END报文、等待结果
+        NetworkPacket response = (NetworkPacket) client.sendAsync(transferEnd).get();
         // 结束回调
         callback.onComplete(fileId, (System.currentTimeMillis() - uploadStart), file.length());
         return response;
@@ -139,6 +155,7 @@ public final class UploadHelper {
      * @throws Exception Exception
      */
     private NetworkPacket uploadMeta(String path) throws Exception {
+        // 获取Overseer地址
         String host = config.get("overseer.host");
         String port = config.get("overseer.port");
         if(StringUtils.isEmpty(host) || StringUtils.isEmpty(port) || !port.matches("^[0-9]*$")){
@@ -150,11 +167,15 @@ public final class UploadHelper {
         File file = new File(path);
         byte[] md5 = FileUtil.md5(path);
         // 创建上传请求
-        FileUploadRequest request = FileUploadRequest.builder().filename(file.getName()).size(file.length()).md5(md5).backupCount(1).build();
-        // 封装报文
-        NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.UPLOAD_REQUEST, serializer.serialize(request, FileUploadRequest.class));
-        // 发送上传请求，并等待结果
-        CompletableFuture<Object> future = this.client.sendAsync(packet);
-        return (NetworkPacket) future.get();
+        FileUploadRequest request = FileUploadRequest.builder()
+                .filename(file.getName())
+                .size(file.length())
+                .md5(md5).backupCount(2)
+                .build();
+        // 序列化、封装报文
+        byte[] serializedRequest = serializer.serialize(request, FileUploadRequest.class);
+        NetworkPacket requestPacket = NetworkPacket.buildPacketOfType(PacketTypes.UPLOAD_REQUEST, serializedRequest);
+        // 发送上传请求，等待结果
+        return (NetworkPacket) client.sendAsync(requestPacket).get();
     }
 }

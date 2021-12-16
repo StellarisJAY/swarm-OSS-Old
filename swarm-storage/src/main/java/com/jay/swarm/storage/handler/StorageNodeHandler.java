@@ -7,12 +7,10 @@ import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.fs.FileInfoCache;
 import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.fs.locator.FileLocator;
-import com.jay.swarm.common.fs.locator.Md5FileLocator;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
-import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.storage.backup.BackupHelper;
 import io.netty.channel.ChannelHandler;
@@ -20,10 +18,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 
 /**
  * <p>
@@ -88,30 +83,50 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
                 // 处理文件传输请求
                 case PacketTypes.TRANSFER_FILE_HEAD:
                     handleTransferHead(channelHandlerContext, packet);break;
+                // 处理文件数据部分
                 case PacketTypes.TRANSFER_FILE_BODY: handleTransferBody(channelHandlerContext, packet);break;
+                // 处理文件传输结束
                 case PacketTypes.TRANSFER_FILE_END: handleTransferEnd(channelHandlerContext, packet);break;
+                // 处理下载请求
                 case PacketTypes.DOWNLOAD_REQUEST:
                     downloadHandler.handleDownloadRequest(channelHandlerContext, packet);
                 default:break;
             }
         }catch (Exception e){
+            // 处理过程异常
             log.error("channel read error: ", e);
-            NetworkPacket errorResponse = NetworkPacket.buildPacketOfType(PacketTypes.ERROR, e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET));
+            NetworkPacket errorResponse = NetworkPacket.buildPacketOfType(PacketTypes.ERROR,
+                    e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET));
             errorResponse.setId(packet.getId());
             channelHandlerContext.channel().writeAndFlush(errorResponse);
         }
     }
 
+    /**
+     * 处理文件头
+     * @param context 上下文
+     * @param packet NetworkPacket
+     * @throws IOException IOException
+     */
     private void handleTransferHead(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
         // 反序列化文件信息
         byte[] content = packet.getContent();
         FileInfo fileInfo = serializer.deserialize(content, FileInfo.class);
+        // 定位文件，即为文件分配目录
         String path = locator.locate(fileInfo.getFileId());
+        // 具体处理过程
         fileTransferHandler.handleTransferHead(fileInfo, path);
+        // 封装response
         NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
         context.channel().writeAndFlush(response);
     }
 
+    /**
+     * 处理文件数据
+     * @param context 上下文
+     * @param packet NetworkPacket
+     * @throws IOException IOException
+     */
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
         // 反序列化分片
         byte[] content = packet.getContent();
@@ -123,10 +138,18 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         context.channel().writeAndFlush(response);
     }
 
+    /**
+     * 处理文件上传结束
+     * @param context 上下文
+     * @param packet NetworkPacket
+     * @throws Exception Exception
+     */
     private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet) throws Exception{
+        // 反序列化结束信息
         byte[] content = packet.getContent();
         FileUploadEnd uploadEnd = serializer.deserialize(content, FileUploadEnd.class);
         String fileId = uploadEnd.getFileId();
+        // 处理END
         fileTransferHandler.handleTransferEnd(fileId);
 
         // 向Overseer通知存储文件结果，文件ID，节点ID
@@ -144,13 +167,12 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         context.channel().writeAndFlush(response);
 
         /*
-            向其他存储节点发送备份，实现备份的最终一致性
-            使用Gossip或者是“接力”方式 。
-            Gossip不太适合，因为这里已知所有节点.
-            “接力”：每个节点随机选一个节点发送备份以及未拥有备份的节点，收到的节点作为下一棒，重复该过程直到所有节点拥有备份。
-            该方法使备份过程不被用户感知，用户只感知到第一个节点的上传过程，因此实现了较高可用性。备份在接力过程中达到最终一致性。
+            查看剩余节点，进行备份接力
          */
         FileInfo fileInfo = fileInfoCache.getFileInfo(fileId);
-        backupHelper.sendBackup(fileInfo, locator.locate(fileId), uploadEnd.getOtherStorages());
+        // 还有没有备份的节点，开始备份接力
+        if(uploadEnd.getOtherStorages() != null && !uploadEnd.getOtherStorages().isEmpty()){
+            backupHelper.sendBackup(fileInfo, locator.locate(fileId), uploadEnd.getOtherStorages());
+        }
     }
 }
