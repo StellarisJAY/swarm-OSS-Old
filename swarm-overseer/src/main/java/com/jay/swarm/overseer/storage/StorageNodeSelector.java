@@ -47,13 +47,19 @@ public class StorageNodeSelector {
             return percentage < average;
         }).collect(Collectors.toList());
 
-        List<StorageInfo> finalSelections;
+        List<StorageInfo> finalSelections = new ArrayList<>(backupCount);
+        finalSelections.addAll(firstSelections);
         // 第二次筛选，筛选出第一次外的容量足够的节点
         if(firstSelections.size() < backupCount){
-            finalSelections = aliveNodes.stream()
-                    .filter(storage->{
-                        return firstSelections.contains(storage) || storage.getFreeStorage() >= metaData.getSize();
-                    }).collect(Collectors.toList());
+            for(StorageInfo storageInfo : aliveNodes){
+                if(backupCount == 0) {
+                    break;
+                }
+                else if(!firstSelections.contains(storageInfo) ){
+                    finalSelections.add(storageInfo);
+                    backupCount--;
+                }
+            }
         }
         else{
             finalSelections = firstSelections;

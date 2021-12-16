@@ -1,4 +1,4 @@
-package com.jay.swarm.client.upload;
+package com.jay.swarm.client.storage;
 
 import com.jay.swarm.common.entity.StorageInfo;
 
@@ -7,8 +7,8 @@ import java.util.List;
 
 /**
  * <p>
- *  客户端只从目标节点集合选择一个作为上传点
- *  其他节点通过“接力”方式传递副本
+ *  客户端只从目标节点集合选择一个作为上传/下载点
+ *  上传点以外的其他节点通过“接力”方式传递副本
  * </p>
  *
  * @author Jay

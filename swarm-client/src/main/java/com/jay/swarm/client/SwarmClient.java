@@ -1,15 +1,18 @@
 package com.jay.swarm.client;
 
+import com.jay.swarm.client.download.DownloadHelper;
 import com.jay.swarm.client.handler.SwarmClientHandler;
 import com.jay.swarm.client.upload.UploadHelper;
 import com.jay.swarm.common.config.Config;
+import com.jay.swarm.common.entity.DownloadResponse;
 import com.jay.swarm.common.network.BaseClient;
-import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
 import lombok.extern.slf4j.Slf4j;
+
+import java.net.ConnectException;
 
 /**
  * <p>
@@ -26,8 +29,9 @@ public class SwarmClient {
     private final Serializer serializer;
     private final Config config;
     private volatile UploadHelper uploadHelper;
-
+    private volatile DownloadHelper downloadHelper;
     private final static String DOWNLOAD_DIR = "D:/swarm/downloads";
+
     public SwarmClient(Config config){
         this.config = config;
         this.client = new BaseClient();
@@ -55,8 +59,30 @@ public class SwarmClient {
         return uploadHelper.upload(path, callback);
     }
 
+    public void download(String fileId){
+        if(downloadHelper == null){
+            synchronized (this){
+                if(downloadHelper == null){
+                    downloadHelper = new DownloadHelper(client, serializer, config);
+                }
+            }
+        }
+       try{
+           DownloadResponse response = downloadHelper.sendDownloadRequest(fileId);
+           downloadHelper.pullData(response);
+       }catch (ConnectException e){
+           log.error("unable to reach target Node, please check Node status, error:", e);
+       }catch (Exception e){
+           log.error("download process error: ", e);
+       }
+    }
+
+    public void shutdownGracefully(){
+        client.shutdown();
+    }
+
     public static void main(String[] args) throws Exception {
         SwarmClient swarmClient = new SwarmClient(new Config(args[0]));
-        swarmClient.upload("D:/01.pdf", new DefaultFileTransferCallback());
+        swarmClient.download("4a56700a-b2c9-40e7-aa95-5a69db41b9ab");
     }
 }
