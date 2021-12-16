@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -41,12 +42,16 @@ public class StorageNode {
     private final BaseClient client;
     private final BaseServer server;
     private final Config config;
-    private final String nodeId;
-
+    private String nodeId;
+    private final Serializer serializer;
     private final String host;
     private final int port;
     private final FileInfoCache fileInfoCache;
     private final String STORAGE_PATH;
+
+    private final FileLocator locator;
+
+    private static final String DEFAULT_NODE_ID_PATH = "node_id.info";
     private static final String DEFAULT_STORAGE_PATH = "D:/storage";
 
     public StorageNode(Config config) throws UnknownHostException {
@@ -59,17 +64,11 @@ public class StorageNode {
         client = new BaseClient();
         server = new BaseServer();
         // 默认序列化工具
-        Serializer serializer = new ProtoStuffSerializer();
+        this.serializer = new ProtoStuffSerializer();
         // 文件定位器
-        FileLocator locator = new Md5FileLocator(this.STORAGE_PATH);
+        locator = new Md5FileLocator(this.STORAGE_PATH);
         // 文件信息缓存
         fileInfoCache = new FileInfoCache(locator);
-        // 传输处理器
-        FileTransferHandler transferHandler = new FileTransferHandler(fileInfoCache);
-        // 下载处理器
-        FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
-        // 服务器添加存储节点处理器
-        server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client, fileInfoCache));
 
 
         // 节点地址
@@ -94,17 +93,26 @@ public class StorageNode {
                 throw new RuntimeException("failed to start storage Node serve, wrong port");
             }
             printBanner();
+            // 检查存储路径
             checkStoragePath();
 
-            server.bind(Integer.parseInt(serverPort));
-            log.info("Storage Node server started, listening: {}", serverPort);
             // 连接Overseer
             client.connect(host, Integer.parseInt(port));
             // 注册节点
             registerNode();
+
             // 开启心跳
             startHeartBeat();
             log.info("successfully connected to Overseer Node at {}:{}", host, port);
+
+            // 服务器添加存储节点处理器，开启服务器
+            // 传输处理器
+            FileTransferHandler transferHandler = new FileTransferHandler(fileInfoCache);
+            // 下载处理器
+            FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
+            server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client, fileInfoCache));
+            server.bind(Integer.parseInt(serverPort));
+            log.info("Storage Node server started, listening: {}", serverPort);
             log.info("Storage Node init finished, time used: {}ms", (System.currentTimeMillis() - initStart));
         }catch (Exception e){
             log.error("failed to init Storage Node");
@@ -130,19 +138,46 @@ public class StorageNode {
         try{
             long registerStart = System.currentTimeMillis();
             // 节点信息
-            byte[] content = getStorageInfo();
+            StorageInfo storageInfo = getStorageInfo();
+            // 加载ID
+            storageInfo.setId(getStorageNodeId());
+            byte[] content = serializer.serialize(storageInfo, StorageInfo.class);
             // 封装报文
             NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.STORAGE_REGISTER, content);
             // 发送注册请求
             CompletableFuture<Object> future = client.sendAsync(packet);
             // 等待Overseer服务器回应
-            Object response = future.get(10, TimeUnit.SECONDS);
-            log.info("Storage Node {} registered to Overseer, time used: {}ms", nodeId, (System.currentTimeMillis() - registerStart));
+            NetworkPacket response = (NetworkPacket) future.get(10, TimeUnit.SECONDS);
+            if(response.getType() == PacketTypes.ERROR){
+                throw new RuntimeException(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));
+            }
+            else{
+                // 由Overseer分配的ID
+                this.nodeId = new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET);
+                // 保存节点ID
+                saveNodeId(nodeId);
+                log.info("storage node successfully registered to Overseer");
+            }
         } catch (Exception e) {
             log.error("failed to register Storage Node");
             throw e;
         }
     }
+
+    private void saveNodeId(String nodeId) throws Exception{
+        try(OutputStream outputStream = new FileOutputStream(DEFAULT_NODE_ID_PATH)){
+            OutputStreamWriter out = new OutputStreamWriter(outputStream);
+            BufferedWriter writer = new BufferedWriter(out);
+            writer.write(nodeId);
+            writer.newLine();
+            writer.close();
+            out.close();
+        }catch (Exception e){
+            log.info("cant save node id");
+            throw e;
+        }
+    }
+
 
     /**
      * 提交心跳任务
@@ -152,7 +187,9 @@ public class StorageNode {
         Runnable heartBeatTask = ()->{
             try{
                 // 节点状态
-                byte[] content = getStorageInfo();
+                StorageInfo storageInfo = getStorageInfo();
+                storageInfo.setId(this.nodeId);
+                byte[] content = serializer.serialize(storageInfo, StorageInfo.class);
                 // 封装心跳包
                 NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.HEART_BEAT, content);
                 // 发送心跳包
@@ -176,20 +213,35 @@ public class StorageNode {
 
     /**
      * 获取节点信息，并序列化为byte
-     * @return byte[]
+     * @return StorageInfo
      */
-    private byte[] getStorageInfo(){
+    private StorageInfo getStorageInfo(){
         File storageDir = new File(DEFAULT_STORAGE_PATH);
-        StorageInfo storageInfo = StorageInfo.builder().host(host)
+        return StorageInfo.builder().host(host)
                 .port(port)
                 .usedStorage(storageDir.getTotalSpace())
                 .freeStorage(storageDir.getFreeSpace())
-                .id(nodeId)
                 .build();
-        log.info("storage node status: {}", storageInfo.toString());
-        Serializer serializer = new ProtoStuffSerializer();
-        return serializer.serialize(storageInfo, StorageInfo.class);
     }
+
+    private String getStorageNodeId() throws Exception{
+        File file = new File(DEFAULT_NODE_ID_PATH);
+        if(!file.exists() || file.isDirectory()){
+            return null;
+        }
+        try(InputStream inputStream = new FileInputStream(file)){
+            InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+            BufferedReader reader = new BufferedReader(inputStreamReader);
+            String line = reader.readLine();
+            reader.close();
+            inputStreamReader.close();
+            return line;
+        }catch (Exception e){
+            log.info("cant load node id from file");
+            throw e;
+        }
+    }
+
     private void printBanner(){
         try(InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("banner")){
             if(inputStream != null){
