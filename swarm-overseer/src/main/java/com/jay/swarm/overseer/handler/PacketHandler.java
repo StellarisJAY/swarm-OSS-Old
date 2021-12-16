@@ -66,7 +66,7 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
             // 注册存储节点
             case PacketTypes.STORAGE_REGISTER: response = storageHandler.handleStorageRegister(packet, ctx.channel());break;
             // 存储节点心跳
-            case PacketTypes.HEART_BEAT: response = storageHandler.handleStorageHeartBeat(packet); break;
+            case PacketTypes.HEART_BEAT: response = storageHandler.handleStorageHeartBeat(packet, ctx.channel()); break;
             // 上传请求
             case PacketTypes.UPLOAD_REQUEST: response = metaDataHandler.handleUploadRequest(packet); break;
             // 更新meta
