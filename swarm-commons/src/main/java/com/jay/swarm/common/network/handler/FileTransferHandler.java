@@ -55,7 +55,6 @@ public class FileTransferHandler {
     public void handleTransferHead(FileInfo fileInfo, String path) throws IOException {
         // 创建appender
         FileAppender fileAppender = new FileAppender(fileInfo.getFileId(), path, fileInfo.getMd5(), fileInfo.getTotalSize(), fileInfo.getShardCount());
-        System.out.println(fileInfo.getFileId());
         appenderMap.put(fileInfo.getFileId(), fileAppender);
         // 缓存文件信息
         if(fileInfoCache != null){

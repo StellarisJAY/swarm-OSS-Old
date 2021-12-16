@@ -69,7 +69,7 @@ public class StorageNode {
         // 下载处理器
         FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache);
         // 服务器添加存储节点处理器
-        server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client));
+        server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client, fileInfoCache));
 
 
         // 节点地址

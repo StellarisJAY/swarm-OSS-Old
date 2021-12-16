@@ -2,7 +2,9 @@ package com.jay.swarm.storage.handler;
 
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.FileMetaStorage;
+import com.jay.swarm.common.entity.FileUploadEnd;
 import com.jay.swarm.common.fs.FileInfo;
+import com.jay.swarm.common.fs.FileInfoCache;
 import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.fs.locator.FileLocator;
 import com.jay.swarm.common.fs.locator.Md5FileLocator;
@@ -12,6 +14,7 @@ import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
 import com.jay.swarm.common.serialize.Serializer;
+import com.jay.swarm.storage.backup.BackupHelper;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -43,13 +46,25 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
     private final BaseClient overseerClient;
     private final String storageNodeId;
 
-    public StorageNodeHandler(String storageNodeId, FileTransferHandler fileTransferHandler, FileDownloadHandler downloadHandler, FileLocator locator, Serializer serializer, BaseClient overseerClient) {
+    /**
+     * 备份同步器
+     */
+    private final BackupHelper backupHelper;
+
+    private final FileInfoCache fileInfoCache;
+
+    public StorageNodeHandler(String storageNodeId, FileTransferHandler fileTransferHandler,
+                              FileDownloadHandler downloadHandler, FileLocator locator,
+                              Serializer serializer, BaseClient overseerClient,
+                              FileInfoCache fileInfoCache) {
         this.fileTransferHandler = fileTransferHandler;
         this.downloadHandler = downloadHandler;
         this.locator = locator;
         this.serializer = serializer;
         this.overseerClient = overseerClient;
         this.storageNodeId = storageNodeId;
+        this.fileInfoCache = fileInfoCache;
+        this.backupHelper = new BackupHelper(serializer);
     }
 
     @Override
@@ -110,18 +125,32 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
 
     private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet) throws Exception{
         byte[] content = packet.getContent();
-        String fileId = new String(content, SwarmConstants.DEFAULT_CHARSET);
+        FileUploadEnd uploadEnd = serializer.deserialize(content, FileUploadEnd.class);
+        String fileId = uploadEnd.getFileId();
         fileTransferHandler.handleTransferEnd(fileId);
 
         // 向Overseer通知存储文件结果，文件ID，节点ID
         FileMetaStorage fileMetaStorage = FileMetaStorage.builder()
                 .storageId(storageNodeId).fileId(fileId).build();
-        NetworkPacket noticeOverseer = NetworkPacket.buildPacketOfType(PacketTypes.UPDATE_FILE_META_STORAGE, serializer.serialize(fileMetaStorage, FileMetaStorage.class));
+        NetworkPacket noticeOverseer = NetworkPacket
+                .buildPacketOfType(PacketTypes.UPDATE_FILE_META_STORAGE,
+                        serializer.serialize(fileMetaStorage, FileMetaStorage.class));
+
         // 等待Overseer的回复
         NetworkPacket overseerResp = (NetworkPacket) overseerClient.sendAsync(noticeOverseer).get();
         NetworkPacket response = NetworkPacket.buildPacketOfType(overseerResp.getType(), overseerResp.getContent());
         response.setId(packet.getId());
-        // 向客户端的回复
+        // 在备份前向用户发送回复，实现高可用性
         context.channel().writeAndFlush(response);
+
+        /*
+            向其他存储节点发送备份，实现备份的最终一致性
+            使用Gossip或者是“接力”方式 。
+            Gossip不太适合，因为这里已知所有节点.
+            “接力”：每个节点随机选一个节点发送备份以及未拥有备份的节点，收到的节点作为下一棒，重复该过程直到所有节点拥有备份。
+            该方法使备份过程不被用户感知，用户只感知到第一个节点的上传过程，因此实现了较高可用性。备份在接力过程中达到最终一致性。
+         */
+        FileInfo fileInfo = fileInfoCache.getFileInfo(fileId);
+        backupHelper.sendBackup(fileInfo, locator.locate(fileId), uploadEnd.getOtherStorages());
     }
 }
