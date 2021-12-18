@@ -1,21 +1,12 @@
 package com.jay.swarm.common.network.handler;
 
-import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.fs.FileAppender;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.fs.FileInfoCache;
-import com.jay.swarm.common.fs.FileShard;
-import com.jay.swarm.common.fs.locator.FileLocator;
-import com.jay.swarm.common.fs.locator.Md5FileLocator;
-import com.jay.swarm.common.network.entity.NetworkPacket;
-import com.jay.swarm.common.network.entity.PacketTypes;
-import com.jay.swarm.common.serialize.ProtoStuffSerializer;
-import com.jay.swarm.common.serialize.Serializer;
-import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -63,11 +54,13 @@ public class FileTransferHandler {
     }
 
 
-    public void handleTransferBody(FileShard shard) throws IOException {
+    public void handleTransferBody(String fileId, byte[] content) throws IOException {
         // 添加分片到文件拼接器
-        String id = shard.getFileId();
-        FileAppender appender = appenderMap.get(id);
-        appender.append(shard.getContent());
+        FileAppender appender = appenderMap.get(fileId);
+        if(appender == null){
+            throw new FileNotFoundException("no file appender found");
+        }
+        appender.append(content);
     }
 
 

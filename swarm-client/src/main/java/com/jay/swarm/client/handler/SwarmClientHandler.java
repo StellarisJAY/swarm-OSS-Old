@@ -2,7 +2,6 @@ package com.jay.swarm.client.handler;
 
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.fs.FileInfo;
-import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
@@ -14,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * <p>
@@ -65,8 +65,11 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
 
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
         byte[] content = packet.getContent();
-        FileShard shard = serializer.deserialize(content, FileShard.class);
-        fileTransferHandler.handleTransferBody(shard);
+        byte[] idBytes = Arrays.copyOfRange(content, 0, 36);
+        String fileId = new String(idBytes, SwarmConstants.DEFAULT_CHARSET);
+        byte[] fileContent = Arrays.copyOfRange(content, 36, content.length);
+        // 处理分片
+        fileTransferHandler.handleTransferBody(fileId, fileContent);
     }
 
     private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet){
