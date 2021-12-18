@@ -42,7 +42,6 @@ import java.util.List;
  */
 @Slf4j
 public class BackupHelper {
-    private volatile BaseClient client;
     private final Serializer serializer;
 
     public BackupHelper(Serializer serializer) {
@@ -59,6 +58,8 @@ public class BackupHelper {
             int maxRetryTimes = storages.size();
             long start = System.currentTimeMillis();
             int retryTimes = 0;
+            // 创建独立客户端
+            BaseClient client = new BaseClient();
             // 尝试同步备份
             while(retryTimes < maxRetryTimes){
                 // 选第一个作为下一棒接力节点
@@ -73,7 +74,6 @@ public class BackupHelper {
                     NetworkPacket head = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, serializedHead);
 
                     // 建立连接
-                    BaseClient client = getClient();
                     client.connect(host, port);
                     // 发送HEAD，等待回复
                     NetworkPacket headResponse = (NetworkPacket) client.sendAsync(head).get();
@@ -111,16 +111,5 @@ public class BackupHelper {
                 }
             }
         }
-    }
-
-    private BaseClient getClient(){
-        if(client == null){
-            synchronized (this){
-                if(client == null){
-                    client = new BaseClient();
-                }
-            }
-        }
-        return client;
     }
 }
