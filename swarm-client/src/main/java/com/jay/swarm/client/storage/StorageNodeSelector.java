@@ -4,6 +4,7 @@ import com.jay.swarm.common.entity.StorageInfo;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * <p>
@@ -33,5 +34,14 @@ public class StorageNodeSelector {
         });
         // 返回第一个
         return storages.remove(0);
+    }
+
+    public static StorageInfo selectRandom(List<StorageInfo> storages){
+        if(storages.size() == 1){
+            return storages.remove(0);
+        }
+        Random random = new Random();
+        int i = random.nextInt(storages.size());
+        return storages.remove(i);
     }
 }
