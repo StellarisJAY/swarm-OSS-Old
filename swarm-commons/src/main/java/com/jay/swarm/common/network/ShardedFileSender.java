@@ -1,7 +1,6 @@
 package com.jay.swarm.common.network;
 
 import com.jay.swarm.common.constants.SwarmConstants;
-import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
@@ -55,8 +54,11 @@ public class ShardedFileSender {
         long sentLength = 0;
         try(FileInputStream inputStream = new FileInputStream(file)){
             FileChannel fileChannel = inputStream.getChannel();
-            // 分配buffer，大小为默认的分片大小
-            ByteBuffer shardBuffer = ByteBuffer.allocate(SwarmConstants.DEFAULT_SHARD_SIZE);
+            // 分配buffer，大小为文件ID大小（36） + 16字节MD5串 + 默认的分片大小
+            ByteBuffer shardBuffer = ByteBuffer.allocate(fileId.length() + SwarmConstants.DEFAULT_SHARD_SIZE);
+            // buffer中放入文件ID
+            shardBuffer.put(fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
+            int idEndPosition = shardBuffer.position();
             int length;
             while((length = fileChannel.read(shardBuffer)) != -1){
                 // 已发送的大小
@@ -64,11 +66,10 @@ public class ShardedFileSender {
                 /*
                     需要优化，过多堆内外拷贝
                  */
-                byte[] shardContent = new byte[length];
+                byte[] content = new byte[length + fileId.length()];
                 shardBuffer.rewind();
-                shardBuffer.get(shardContent);
-                FileShard fileShard = FileShard.builder().fileId(fileId).content(shardContent).build();
-                NetworkPacket shardPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_BODY, serializer.serialize(fileShard, FileShard.class));
+                shardBuffer.get(content);
+                NetworkPacket shardPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_BODY, content);
                 if(channel == null){
                     CompletableFuture<Object> future = client.sendAsync(shardPacket);
                 }
@@ -78,6 +79,7 @@ public class ShardedFileSender {
                 float progress = new BigDecimal(sentLength * 100).divide(new BigDecimal(totalSize), 2, RoundingMode.HALF_DOWN).floatValue();
                 callback.onProgress(fileId, totalSize, sentLength, progress);
                 shardBuffer.clear();
+                shardBuffer.position(idEndPosition);
             }
             fileChannel.close();
         }catch (Exception e){

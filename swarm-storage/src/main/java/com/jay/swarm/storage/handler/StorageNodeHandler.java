@@ -5,7 +5,6 @@ import com.jay.swarm.common.entity.FileMetaStorage;
 import com.jay.swarm.common.entity.FileUploadEnd;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.fs.FileInfoCache;
-import com.jay.swarm.common.fs.FileShard;
 import com.jay.swarm.common.fs.locator.FileLocator;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.entity.NetworkPacket;
@@ -19,6 +18,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * <p>
@@ -64,8 +64,9 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        log.info("channel closed by remote address: {}", ctx.channel().remoteAddress());
-        ctx.channel().close();
+        if(log.isDebugEnabled()){
+            log.debug("connection closed by remote address {}", ctx.channel().remoteAddress());
+        }
     }
 
     @Override
@@ -130,9 +131,11 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
         // 反序列化分片
         byte[] content = packet.getContent();
-        FileShard shard = serializer.deserialize(content, FileShard.class);
+        byte[] idBytes = Arrays.copyOfRange(content, 0, 36);
+        String fileId = new String(idBytes, SwarmConstants.DEFAULT_CHARSET);
+        byte[] fileContent = Arrays.copyOfRange(content, 36, content.length);
         // 处理分片
-        fileTransferHandler.handleTransferBody(shard);
+        fileTransferHandler.handleTransferBody(fileId, fileContent);
         // 回复报文
         NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
         context.channel().writeAndFlush(response);
@@ -169,10 +172,10 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         /*
             查看剩余节点，进行备份接力
          */
-        FileInfo fileInfo = fileInfoCache.getFileInfo(fileId);
-        // 还有没有备份的节点，开始备份接力
-        if(uploadEnd.getOtherStorages() != null && !uploadEnd.getOtherStorages().isEmpty()){
-            backupHelper.sendBackup(fileInfo, locator.locate(fileId), uploadEnd.getOtherStorages());
-        }
+//        FileInfo fileInfo = fileInfoCache.getFileInfo(fileId);
+//        // 还有没有备份的节点，开始备份接力
+//        if(uploadEnd.getOtherStorages() != null && !uploadEnd.getOtherStorages().isEmpty()){
+//            backupHelper.sendBackup(fileInfo, locator.locate(fileId), uploadEnd.getOtherStorages());
+//        }
     }
 }

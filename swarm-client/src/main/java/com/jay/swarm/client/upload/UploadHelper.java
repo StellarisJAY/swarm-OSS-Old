@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * <p>
@@ -65,7 +64,6 @@ public final class UploadHelper {
             FileUploadResponse fileUploadResponse = serializer.deserialize(content, FileUploadResponse.class);
             String fileId = fileUploadResponse.getFileId();
             List<StorageInfo> storages = fileUploadResponse.getStorageNodes();
-
             // 向storage发送文件
             NetworkPacket uploadFileResponse = uploadFileData(path, fileId, storages, callback);
 
@@ -94,11 +92,12 @@ public final class UploadHelper {
      * @throws Exception Exception
      */
     private NetworkPacket uploadFileData(String path, String fileId, List<StorageInfo> storages, FileTransferCallback callback) throws Exception {
+        long uploadDataStart = System.currentTimeMillis();
         /*
             选择目标存储节点
             选择一个节点作为上传点，剩下的备份由storage节点间接力传递
          */
-        StorageInfo targetStorageNode = StorageNodeSelector.select(storages);
+        StorageInfo targetStorageNode = StorageNodeSelector.selectRandom(storages);
 
         // 连接 上传点
         this.client.connect(targetStorageNode.getHost(), targetStorageNode.getPort());
@@ -144,6 +143,9 @@ public final class UploadHelper {
         NetworkPacket response = (NetworkPacket) client.sendAsync(transferEnd).get();
         // 结束回调
         callback.onComplete(fileId, (System.currentTimeMillis() - uploadStart), file.length());
+
+        log.info("upload data finished, time used: {} ms", (System.currentTimeMillis() - uploadDataStart));
+
         return response;
     }
 
@@ -155,6 +157,7 @@ public final class UploadHelper {
      * @throws Exception Exception
      */
     private NetworkPacket uploadMeta(String path) throws Exception {
+        long uploadMetaStart = System.currentTimeMillis();
         // 获取Overseer地址
         String host = config.get("overseer.host");
         String port = config.get("overseer.port");
@@ -176,6 +179,8 @@ public final class UploadHelper {
         byte[] serializedRequest = serializer.serialize(request, FileUploadRequest.class);
         NetworkPacket requestPacket = NetworkPacket.buildPacketOfType(PacketTypes.UPLOAD_REQUEST, serializedRequest);
         // 发送上传请求，等待结果
-        return (NetworkPacket) client.sendAsync(requestPacket).get();
+        NetworkPacket result =  (NetworkPacket) client.sendAsync(requestPacket).get();
+        log.info("{} upload meta finished, time used {} ms", path, (System.currentTimeMillis() - uploadMetaStart));
+        return result;
     }
 }
