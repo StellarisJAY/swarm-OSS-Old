@@ -45,6 +45,8 @@ public class Persistence {
     private static final String DEFAULT_PERSISTENCE_PATH = "D:/swarm/meta-data.dump";
     private final Config config;
     private final Serializer serializer;
+
+
     public Persistence(MetaDataManager metaDataManager, Config config, Serializer serializer) {
         this.metaDataManager = metaDataManager;
         this.config = config;
@@ -80,7 +82,8 @@ public class Persistence {
             metaDataPersistence(metaData, finalFilePath);
             log.debug("metadata saved, time used: {} ms", (System.currentTimeMillis() - perStart));
         }, time,  time, TimeUnit.MILLISECONDS);
-        log.debug("persistence init finished, loaded {} meta-data time used: {} ms", countMeta, (System.currentTimeMillis() - initStart));
+        addShutdownPersistence(filePath);
+        log.info("persistence init finished, loaded {} meta-data time used: {} ms", countMeta, (System.currentTimeMillis() - initStart));
     }
 
     /**
@@ -103,13 +106,18 @@ public class Persistence {
                 while(length > 0){
                     byte b = buffer.get();
                     if(b == (byte)'\r'){
-                        // 读取一行字节
-                        byte[] serialized = byteArray.array();
-                        // 反序列化
-                        MetaData metaData = serializer.deserialize(serialized, MetaData.class);
-                        metaDataManager.putMetaData(metaData);
-                        loaded++;
-                        byteArray.flush();
+                        try{
+                            // 读取一行字节
+                            byte[] serialized = byteArray.array();
+                            // 反序列化
+                            MetaData metaData = serializer.deserialize(serialized, MetaData.class);
+                            metaDataManager.putMetaData(metaData);
+                            loaded++;
+                        }catch (Exception e){
+                            log.debug("wrong persistence line skipped");
+                        }finally {
+                            byteArray.flush();
+                        }
                     }else{
                         byteArray.append(b);
                     }
@@ -135,20 +143,34 @@ public class Persistence {
             FileChannel channel = outputStream.getChannel();
             // 每个metaData序列化后写入文件
             for(MetaData meta : metaData){
-                // 序列化
-                byte[] serialized = serializer.serialize(meta, MetaData.class);
-                // 创建buffer，大小为序列化后字节数 + 换行符
-                ByteBuffer buffer = ByteBuffer.allocate(serialized.length + 1);
-                buffer.put(serialized);
-                buffer.put((byte)'\r');
-                buffer.rewind();
-                // 写入channel
-                channel.write(buffer);
-                buffer.clear();
+                if(!meta.getStorages().isEmpty()){
+                    // 序列化
+                    byte[] serialized = serializer.serialize(meta, MetaData.class);
+                    // 创建buffer，大小为序列化后字节数 + 换行符
+                    ByteBuffer buffer = ByteBuffer.allocate(serialized.length + 1);
+                    buffer.put(serialized);
+                    buffer.put((byte)'\r');
+                    buffer.rewind();
+                    // 写入channel
+                    channel.write(buffer);
+                    buffer.clear();
+                }
             }
             channel.close();
         }catch (IOException e){
             log.error("metadata persistence failed: ", e);
         }
     }
+
+    private void addShutdownPersistence(String filePath){
+        Runtime.getRuntime().addShutdownHook(new Thread(()->{
+            long perStart = System.currentTimeMillis();
+            // 获取当前元数据缓存的快照副本
+            List<MetaData> metaData = metaDataManager.copyOfCache();
+            // 持久化副本
+            metaDataPersistence(metaData, filePath);
+            log.info("metadata saved, time used: {} ms", (System.currentTimeMillis() - perStart));
+        }));
+    }
+
 }
