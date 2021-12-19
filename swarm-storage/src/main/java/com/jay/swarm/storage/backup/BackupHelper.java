@@ -14,6 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -43,12 +48,40 @@ import java.util.List;
 @Slf4j
 public class BackupHelper {
     private final Serializer serializer;
+    private final BaseClient peerNodeClient;
+    /**
+     * 备份线程
+     */
+    private static final ThreadPoolExecutor executor = new ThreadPoolExecutor(3, 5, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), new ThreadFactory() {
+        AtomicInteger idProvider = new AtomicInteger(0);
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(r, "backup-thread-" + idProvider.incrementAndGet());
+        }
+    });
 
     public BackupHelper(Serializer serializer) {
         this.serializer = serializer;
+        this.peerNodeClient = new BaseClient();
     }
 
-    public void sendBackup(FileInfo fileInfo, String path, List<StorageInfo> storages){
+    /**
+     * 提交备份任务
+     * @param fileInfo 文件信息
+     * @param path 存储路径
+     * @param storages 待备份节点
+     */
+    public void submitBackupTask(FileInfo fileInfo, String path, List<StorageInfo> storages){
+        executor.execute(()->{
+            try{
+                sendBackup(fileInfo, path, storages);
+            }catch (Exception e){
+                log.debug("backup task for file "  + fileInfo.getFileId() + " failed");
+            }
+        });
+    }
+
+    private void sendBackup(FileInfo fileInfo, String path, List<StorageInfo> storages){
         if(storages != null && !storages.isEmpty()){
             /*
                 轮询尝试方式向一个节点发送备份
@@ -58,8 +91,6 @@ public class BackupHelper {
             int maxRetryTimes = storages.size();
             long start = System.currentTimeMillis();
             int retryTimes = 0;
-            // 创建独立客户端
-            BaseClient client = new BaseClient();
             // 尝试同步备份
             while(retryTimes < maxRetryTimes){
                 // 选第一个作为下一棒接力节点
@@ -73,17 +104,15 @@ public class BackupHelper {
                     byte[] serializedHead = serializer.serialize(fileInfo, FileInfo.class);
                     NetworkPacket head = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, serializedHead);
 
-                    // 建立连接
-                    client.connect(host, port);
                     // 发送HEAD，等待回复
-                    NetworkPacket headResponse = (NetworkPacket) client.sendAsync(head).get();
+                    NetworkPacket headResponse = (NetworkPacket) peerNodeClient.sendAsync(host, port, head).get();
                     if(headResponse.getType() == PacketTypes.ERROR){
                         throw new RuntimeException(new String(headResponse.getContent(), SwarmConstants.DEFAULT_CHARSET));
                     }
 
                     // 发送文件数据
-                    ShardedFileSender shardedFileSender = new ShardedFileSender(client, serializer, new DefaultFileTransferCallback());
-                    shardedFileSender.send(new File(path), fileInfo.getFileId());
+                    ShardedFileSender shardedFileSender = new ShardedFileSender(peerNodeClient, serializer, new DefaultFileTransferCallback());
+                    shardedFileSender.send(host, port, new File(path), fileInfo.getFileId());
 
                     // 封装END报文
                     FileUploadEnd uploadEnd = FileUploadEnd.builder()
@@ -93,7 +122,7 @@ public class BackupHelper {
                     byte[] serializedEnd = serializer.serialize(uploadEnd, FileUploadEnd.class);
                     NetworkPacket end = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, serializedEnd);
                     // 发送END，等待最终返回
-                    NetworkPacket finalResponse = (NetworkPacket) client.sendAsync(end).get();
+                    NetworkPacket finalResponse = (NetworkPacket) peerNodeClient.sendAsync(host, port, end).get();
 
                     if(finalResponse.getType() == PacketTypes.SUCCESS){
                         log.info("backup synchronized to peer storage node, time used {} ms", (System.currentTimeMillis() - start));

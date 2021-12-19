@@ -44,11 +44,9 @@ public class DownloadHelper {
         if(StringUtils.isEmpty(host) || StringUtils.isEmpty(port)){
             throw new IllegalArgumentException("invalid overseer address");
         }
-        // 连接Overseer
-        client.connect(host, Integer.parseInt(port));
         // 发送下载请求
         NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
-        NetworkPacket response = (NetworkPacket)client.sendAsync(packet).get();
+        NetworkPacket response = (NetworkPacket)client.sendAsync(host, Integer.parseInt(port), packet).get();
 
         // 收到异常返回
         if(response.getType() == PacketTypes.ERROR){
@@ -69,10 +67,8 @@ public class DownloadHelper {
         String host = targetStorage.getHost();
         int port = targetStorage.getPort();
 
-        client.connect(host, port);
-
         NetworkPacket request = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
-        NetworkPacket response = (NetworkPacket)client.sendAsync(request).get();
+        NetworkPacket response = (NetworkPacket)client.sendAsync(host, port, request).get();
 
         if(response.getType() == PacketTypes.ERROR){
             throw new RuntimeException(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));

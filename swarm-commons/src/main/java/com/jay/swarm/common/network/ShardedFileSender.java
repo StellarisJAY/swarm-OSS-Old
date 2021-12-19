@@ -49,7 +49,11 @@ public class ShardedFileSender {
         this.serializer = serializer;
     }
 
-    public void send(File file, String fileId){
+    public void send(File file,  String fileId){
+        send(null, 0, file, fileId);
+    }
+
+    public void send(String host, int port, File file, String fileId){
         long totalSize = file.length();
         long sentLength = 0;
         try(FileInputStream inputStream = new FileInputStream(file)){
@@ -70,10 +74,9 @@ public class ShardedFileSender {
                 shardBuffer.rewind();
                 shardBuffer.get(content);
                 NetworkPacket shardPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_BODY, content);
-                if(channel == null){
-                    CompletableFuture<Object> future = client.sendAsync(shardPacket);
-                }
-                else{
+                if(client != null && host != null){
+                    client.sendAsync(host, port, shardPacket);
+                }else if(channel != null){
                     channel.writeAndFlush(shardPacket);
                 }
                 float progress = new BigDecimal(sentLength * 100).divide(new BigDecimal(totalSize), 2, RoundingMode.HALF_DOWN).floatValue();

@@ -1,5 +1,6 @@
 package com.jay.swarm.storage.handler;
 
+import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.FileMetaStorage;
 import com.jay.swarm.common.entity.FileUploadEnd;
@@ -48,10 +49,12 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
 
     private final FileInfoCache fileInfoCache;
 
+    private final Config config;
+
     public StorageNodeHandler(String storageNodeId, FileTransferHandler fileTransferHandler,
                               FileDownloadHandler downloadHandler, FileLocator locator,
                               Serializer serializer, BaseClient overseerClient,
-                              FileInfoCache fileInfoCache) {
+                              FileInfoCache fileInfoCache, Config config) {
         this.fileTransferHandler = fileTransferHandler;
         this.downloadHandler = downloadHandler;
         this.locator = locator;
@@ -60,6 +63,7 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         this.storageNodeId = storageNodeId;
         this.fileInfoCache = fileInfoCache;
         this.backupHelper = new BackupHelper(serializer);
+        this.config = config;
     }
 
     @Override
@@ -155,6 +159,9 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         // 处理END
         fileTransferHandler.handleTransferEnd(fileId);
 
+        String overseerHost = config.get("overseer.host");
+        int port = Integer.parseInt(config.get("overseer.port"));
+
         // 向Overseer通知存储文件结果，文件ID，节点ID
         FileMetaStorage fileMetaStorage = FileMetaStorage.builder()
                 .storageId(storageNodeId).fileId(fileId).build();
@@ -163,7 +170,7 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
                         serializer.serialize(fileMetaStorage, FileMetaStorage.class));
 
         // 等待Overseer的回复
-        NetworkPacket overseerResp = (NetworkPacket) overseerClient.sendAsync(noticeOverseer).get();
+        NetworkPacket overseerResp = (NetworkPacket) overseerClient.sendAsync(overseerHost, port, noticeOverseer).get();
         NetworkPacket response = NetworkPacket.buildPacketOfType(overseerResp.getType(), overseerResp.getContent());
         response.setId(packet.getId());
         // 在备份前向用户发送回复，实现高可用性
@@ -172,10 +179,10 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         /*
             查看剩余节点，进行备份接力
          */
-//        FileInfo fileInfo = fileInfoCache.getFileInfo(fileId);
-//        // 还有没有备份的节点，开始备份接力
-//        if(uploadEnd.getOtherStorages() != null && !uploadEnd.getOtherStorages().isEmpty()){
-//            backupHelper.sendBackup(fileInfo, locator.locate(fileId), uploadEnd.getOtherStorages());
-//        }
+        FileInfo fileInfo = fileInfoCache.getFileInfo(fileId);
+        // 还有没有备份的节点，开始备份接力
+        if(uploadEnd.getOtherStorages() != null && !uploadEnd.getOtherStorages().isEmpty()){
+            backupHelper.submitBackupTask(fileInfo, fileInfoCache.getPath(fileId), uploadEnd.getOtherStorages());
+        }
     }
 }
