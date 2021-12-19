@@ -136,8 +136,9 @@ public class Persistence {
      * 持久化过程
      * @param metaData 元数据集合
      */
-    private void metaDataPersistence(List<MetaData> metaData, String path){
+    private int metaDataPersistence(List<MetaData> metaData, String path){
         File file = new File(path);
+        int savedMeta = 0;
         try(FileOutputStream outputStream = new FileOutputStream(file)){
             // channel
             FileChannel channel = outputStream.getChannel();
@@ -154,12 +155,14 @@ public class Persistence {
                     // 写入channel
                     channel.write(buffer);
                     buffer.clear();
+                    savedMeta++;
                 }
             }
             channel.close();
         }catch (IOException e){
             log.error("metadata persistence failed: ", e);
         }
+        return savedMeta;
     }
 
     private void addShutdownPersistence(String filePath){
@@ -168,8 +171,8 @@ public class Persistence {
             // 获取当前元数据缓存的快照副本
             List<MetaData> metaData = metaDataManager.copyOfCache();
             // 持久化副本
-            metaDataPersistence(metaData, filePath);
-            log.info("metadata saved, time used: {} ms", (System.currentTimeMillis() - perStart));
+            int saved = metaDataPersistence(metaData, filePath);
+            log.info("{} metadata saved, time used: {} ms", saved, (System.currentTimeMillis() - perStart));
         }));
     }
 
