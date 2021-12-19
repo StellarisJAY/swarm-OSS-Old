@@ -62,7 +62,9 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        log.info("connection closed by remote address {}", ctx.channel().remoteAddress());
+        if(log.isDebugEnabled()){
+            log.debug("connection closed by remote address {}", ctx.channel().remoteAddress());
+        }
     }
 
     @Override

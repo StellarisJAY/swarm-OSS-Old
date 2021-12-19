@@ -10,6 +10,7 @@ import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.ShardedFileSender;
+import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
@@ -32,15 +33,33 @@ import java.util.List;
 @Slf4j
 public final class UploadHelper {
 
-    private final BaseClient client;
+    private final BaseClient overseerClient;
+    private final BaseClient storageClient;
     private final Serializer serializer;
     private final Config config;
 
-    public UploadHelper(BaseClient client, Serializer serializer, Config config) {
-        this.client = client;
+
+
+    public UploadHelper(BaseClient overseerClient, BaseClient storageClient, Serializer serializer, Config config) {
+        this.overseerClient = overseerClient;
         this.serializer = serializer;
         this.config = config;
+        this.storageClient = storageClient;
     }
+
+    public void init() throws Exception {
+        // 获取Overseer地址
+        String host = config.get("overseer.host");
+        String port = config.get("overseer.port");
+        if(StringUtils.isEmpty(host) || StringUtils.isEmpty(port) || !port.matches("^[0-9]*$")){
+            throw new IllegalArgumentException("invalid overseer address");
+        }
+        // 连接Overseer
+        this.overseerClient.connect(host, Integer.parseInt(port));
+    }
+
+
+
 
     /**
      * 上传文件
@@ -49,10 +68,13 @@ public final class UploadHelper {
      * @return 文件ID
      * @throws Exception Exception
      */
-    public String upload(String path, FileTransferCallback callback) throws Exception {
+    public String upload(String path, int backupCount, FileTransferCallback callback) throws Exception {
+        if(backupCount < 0 || StringUtils.isEmpty(path)){
+            throw new IllegalArgumentException("wrong argument for upload ");
+        }
         try{
             // 向Overseer发送上传请求，获得overseer返回的存储节点和fileId
-            NetworkPacket metaResponse = uploadMeta(path);
+            NetworkPacket metaResponse = uploadMeta(path, backupCount);
             short metaResponseType = metaResponse.getType();
             // Overseer返回错误
             if(metaResponseType == PacketTypes.ERROR){
@@ -99,11 +121,6 @@ public final class UploadHelper {
          */
         StorageInfo targetStorageNode = StorageNodeSelector.selectRandom(storages);
 
-        // 连接 上传点
-        this.client.connect(targetStorageNode.getHost(), targetStorageNode.getPort());
-        // 上传文件开始时间
-        long uploadStart = System.currentTimeMillis();
-
         // 计算文件MD5
         File file = new File(path);
         byte[] md5 = FileUtil.md5(path);
@@ -119,14 +136,14 @@ public final class UploadHelper {
         byte[] headSerialized = serializer.serialize(fileInfo, FileInfo.class);
         NetworkPacket headPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, headSerialized);
         // 发送HEAD
-        client.sendAsync(headPacket);
+        storageClient.sendAsync(targetStorageNode.getHost(), targetStorageNode.getPort(), headPacket);
 
         /*
             文件分片
          */
-        ShardedFileSender shardedFileSender = new ShardedFileSender(client, serializer, callback);
+        ShardedFileSender shardedFileSender = new ShardedFileSender(storageClient, serializer, callback);
         // 发送分片
-        shardedFileSender.send(file, fileId);
+        shardedFileSender.send(targetStorageNode.getHost(), targetStorageNode.getPort(), file, fileId);
 
         /*
             END 报文
@@ -140,9 +157,9 @@ public final class UploadHelper {
         byte[] endSerialized = serializer.serialize(uploadEnd, FileUploadEnd.class);
         NetworkPacket transferEnd = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, endSerialized);
         // 发送END报文、等待结果
-        NetworkPacket response = (NetworkPacket) client.sendAsync(transferEnd).get();
+        NetworkPacket response = (NetworkPacket) storageClient.sendAsync(targetStorageNode.getHost(), targetStorageNode.getPort(), transferEnd).get();
         // 结束回调
-        callback.onComplete(fileId, (System.currentTimeMillis() - uploadStart), file.length());
+        callback.onComplete(fileId, (System.currentTimeMillis() - uploadDataStart), file.length());
 
         log.info("upload data finished, time used: {} ms", (System.currentTimeMillis() - uploadDataStart));
 
@@ -156,30 +173,29 @@ public final class UploadHelper {
      * @return response NetworkPacket
      * @throws Exception Exception
      */
-    private NetworkPacket uploadMeta(String path) throws Exception {
+    private NetworkPacket uploadMeta(String path, int backupCount) throws Exception {
         long uploadMetaStart = System.currentTimeMillis();
         // 获取Overseer地址
         String host = config.get("overseer.host");
         String port = config.get("overseer.port");
-        if(StringUtils.isEmpty(host) || StringUtils.isEmpty(port) || !port.matches("^[0-9]*$")){
-            throw new IllegalArgumentException("invalid overseer address");
-        }
-        // 连接Overseer
-        this.client.connect(host, Integer.parseInt(port));
         // 计算文件MD5
         File file = new File(path);
+
         byte[] md5 = FileUtil.md5(path);
+
         // 创建上传请求
         FileUploadRequest request = FileUploadRequest.builder()
                 .filename(file.getName())
                 .size(file.length())
-                .md5(md5).backupCount(2)
+                .md5(md5).backupCount(backupCount + 1)
                 .build();
         // 序列化、封装报文
+
         byte[] serializedRequest = serializer.serialize(request, FileUploadRequest.class);
+
         NetworkPacket requestPacket = NetworkPacket.buildPacketOfType(PacketTypes.UPLOAD_REQUEST, serializedRequest);
         // 发送上传请求，等待结果
-        NetworkPacket result =  (NetworkPacket) client.sendAsync(requestPacket).get();
+        NetworkPacket result =  (NetworkPacket) overseerClient.sendAsync(host, Integer.parseInt(port), requestPacket).get();
         log.info("{} upload meta finished, time used {} ms", path, (System.currentTimeMillis() - uploadMetaStart));
         return result;
     }

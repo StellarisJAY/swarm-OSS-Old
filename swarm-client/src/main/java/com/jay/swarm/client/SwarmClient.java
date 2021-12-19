@@ -6,6 +6,7 @@ import com.jay.swarm.client.upload.UploadHelper;
 import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.entity.DownloadResponse;
 import com.jay.swarm.common.network.BaseClient;
+import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.ProtoStuffSerializer;
@@ -25,20 +26,35 @@ import java.net.ConnectException;
  */
 @Slf4j
 public class SwarmClient {
-    private final BaseClient client;
+    private final BaseClient overseerClient;
+    private final BaseClient storageClient;
     private final Serializer serializer;
     private final Config config;
-    private volatile UploadHelper uploadHelper;
-    private volatile DownloadHelper downloadHelper;
+    private final UploadHelper uploadHelper;
+    private final DownloadHelper downloadHelper;
     private final static String DOWNLOAD_DIR = "D:/swarm/downloads";
+    private static final int DEFAULT_BACKUP_COUNT = 2;
 
     public SwarmClient(Config config){
         this.config = config;
-        this.client = new BaseClient();
+        this.overseerClient = new BaseClient();
+        this.storageClient = new BaseClient();
         this.serializer = new ProtoStuffSerializer();
         FileTransferHandler transferHandler = new FileTransferHandler();
         SwarmClientHandler clientHandler = new SwarmClientHandler(transferHandler, serializer, DOWNLOAD_DIR);
-        this.client.addHandler(clientHandler);
+        this.overseerClient.addHandler(clientHandler);
+        this.uploadHelper = new UploadHelper(overseerClient, storageClient, serializer, config);
+        this.downloadHelper = new DownloadHelper(overseerClient, serializer, config);
+        init();
+    }
+
+    private void init(){
+        try {
+            this.uploadHelper.init();
+        } catch (Exception e) {
+            e.printStackTrace();
+            this.shutdownGracefully();
+        }
     }
 
     /**
@@ -48,25 +64,31 @@ public class SwarmClient {
      * @return 文件ID
      */
     public String upload(String path, FileTransferCallback callback) throws Exception {
-        // 上传功能懒加载，避免启动时创建客户端连接
-        if(uploadHelper == null){
-            synchronized (this){
-                if(uploadHelper == null){
-                    uploadHelper = new UploadHelper(client, serializer, config);
-                }
-            }
-        }
-        return uploadHelper.upload(path, callback);
+        return uploadHelper.upload(path, DEFAULT_BACKUP_COUNT, callback);
+    }
+
+    /**
+     * 上传文件
+     * @param path 文件路径
+     * @return 文件ID
+     * @throws Exception Exception
+     */
+    public String upload(String path) throws Exception{
+        return uploadHelper.upload(path, DEFAULT_BACKUP_COUNT, new DefaultFileTransferCallback());
+    }
+
+    /**
+     * 上传文件，使用默认的callback
+     * @param path 文件路径
+     * @param backupCount 备份数量
+     * @return 文件ID
+     * @throws Exception Exception
+     */
+    public String upload(String path, int backupCount) throws Exception{
+        return uploadHelper.upload(path, backupCount, new DefaultFileTransferCallback());
     }
 
     public void download(String fileId){
-        if(downloadHelper == null){
-            synchronized (this){
-                if(downloadHelper == null){
-                    downloadHelper = new DownloadHelper(client, serializer, config);
-                }
-            }
-        }
        try{
            DownloadResponse response = downloadHelper.sendDownloadRequest(fileId);
            downloadHelper.pullData(response);
@@ -77,12 +99,11 @@ public class SwarmClient {
        }
     }
 
-    public void shutdownGracefully(){
-        client.shutdown();
-    }
 
-    public static void main(String[] args) throws Exception {
-        SwarmClient swarmClient = new SwarmClient(new Config(args[0]));
-        swarmClient.download("4a56700a-b2c9-40e7-aa95-5a69db41b9ab");
+
+
+    public void shutdownGracefully(){
+        overseerClient.shutdown();
+        storageClient.shutdown();
     }
 }

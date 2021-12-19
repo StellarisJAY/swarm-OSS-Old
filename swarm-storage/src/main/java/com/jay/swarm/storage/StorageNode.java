@@ -20,6 +20,7 @@ import com.jay.swarm.storage.handler.StorageNodeHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
+import java.net.ConnectException;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.UUID;
@@ -38,7 +39,7 @@ import java.util.concurrent.TimeoutException;
  **/
 @Slf4j
 public class StorageNode {
-    private final BaseClient client;
+    private final BaseClient overseerClient;
     private final BaseServer server;
     private final Config config;
     private String nodeId;
@@ -60,7 +61,7 @@ public class StorageNode {
         this.STORAGE_PATH = StringUtils.isEmpty(storagePath) ? DEFAULT_STORAGE_PATH : storagePath;
         // 生成节点ID
         this.nodeId = UUID.randomUUID().toString();
-        client = new BaseClient();
+        this.overseerClient = new BaseClient();
         server = new BaseServer();
         // 默认序列化工具
         this.serializer = new ProtoStuffSerializer();
@@ -68,7 +69,6 @@ public class StorageNode {
         locator = new Md5FileLocator(this.STORAGE_PATH);
         // 文件信息缓存
         fileInfoCache = new FileInfoCache(locator);
-
 
         // 节点地址
         host = Inet4Address.getLocalHost().getHostAddress();
@@ -95,19 +95,17 @@ public class StorageNode {
             // 检查存储路径
             checkStoragePath();
 
-            // 连接Overseer
-            client.connect(host, Integer.parseInt(port));
             log.info("successfully connected to Overseer Node at {}:{}", host, port);
             // 注册节点
-            registerNode();
+            registerNode(host, Integer.parseInt(port));
             // 开启心跳
-            startHeartBeat();
+            startHeartBeat(host, Integer.parseInt(port));
             // 服务器添加存储节点处理器，开启服务器
             // 传输处理器
             FileTransferHandler transferHandler = new FileTransferHandler(fileInfoCache);
             // 下载处理器
             FileDownloadHandler downloadHandler = new FileDownloadHandler(fileInfoCache, serializer);
-            server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, client, fileInfoCache));
+            server.addHandler(new StorageNodeHandler(nodeId, transferHandler, downloadHandler, locator, serializer, overseerClient, fileInfoCache, config));
             server.bind(Integer.parseInt(serverPort));
             log.info("Storage Node server started, listening: {}", serverPort);
             log.info("Storage Node init finished, time used: {}ms", (System.currentTimeMillis() - initStart));
@@ -131,7 +129,7 @@ public class StorageNode {
      * 注册StorageNode
      * @throws Exception exception
      */
-    public void registerNode() throws Exception {
+    public void registerNode(String host, int port) throws Exception {
         try{
             long registerStart = System.currentTimeMillis();
             // 节点信息
@@ -142,7 +140,7 @@ public class StorageNode {
             // 封装报文
             NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.STORAGE_REGISTER, content);
             // 发送注册请求
-            CompletableFuture<Object> future = client.sendAsync(packet);
+            CompletableFuture<Object> future = overseerClient.sendAsync(host, port, packet);
             // 等待Overseer服务器回应
             NetworkPacket response = (NetworkPacket) future.get(10, TimeUnit.SECONDS);
             if(response.getType() == PacketTypes.ERROR){
@@ -182,7 +180,7 @@ public class StorageNode {
      * 提交心跳任务
      * 用心跳包让Overseer知道当前节点存活
      */
-    private void startHeartBeat(){
+    private void startHeartBeat(String host, int port){
         Runnable heartBeatTask = ()->{
             try{
                 // 节点状态
@@ -192,17 +190,20 @@ public class StorageNode {
                 // 封装心跳包
                 NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.HEART_BEAT, content);
                 // 发送心跳包
-                CompletableFuture<Object> future = client.sendAsync(packet);
+                CompletableFuture<Object> future = overseerClient.sendAsync(host, port, packet);
                 /*
                     等待Overseer的心跳回应
                  */
+                long s = System.currentTimeMillis();
                 Object response = future.get(SwarmConstants.DEFAULT_HEARTBEAT_PERIOD, TimeUnit.MILLISECONDS);
-                log.debug("heart-beat finished , status: {}", "success");
+                log.debug("heart-beat finished , time used: {}ms", (System.currentTimeMillis() - s));
             } catch (ExecutionException | InterruptedException e) {
                 log.error("heart-beat ends with exception", e);
             } catch (TimeoutException e) {
                 // 等待Overseer回应超时
                 log.error("heart-beat timeout", e);
+            } catch (ConnectException e) {
+                e.printStackTrace();
             }
         };
         // 提交心跳周期任务，延迟一个周期开始

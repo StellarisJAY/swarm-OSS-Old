@@ -23,7 +23,7 @@ public class DefaultFileTransferCallback implements FileTransferCallback {
 
     @Override
     public void onComplete(String fileId, long timeUsed, long size) {
-        log.info("file {} transfer finished: time used {} ms, size: {}, speed: {}", fileId, timeUsed, formatSize(size), calculateSpeed(size, timeUsed));
+        log.debug("file {} transfer finished: time used {} ms, size: {}, speed: {}", fileId, timeUsed, formatSize(size), calculateSpeed(size, timeUsed));
     }
 
     private String formatSize(long size){
