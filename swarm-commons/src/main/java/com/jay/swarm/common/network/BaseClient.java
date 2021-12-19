@@ -67,9 +67,8 @@ public class BaseClient {
     public CompletableFuture<Object> sendAsync(NetworkPacket packet){
         CompletableFuture<Object> result = new CompletableFuture<>();
         packet.setId(idProvider.getAndIncrement());
-        channel.writeAndFlush(packet).addListener((ChannelFutureListener)listener->{
-            responseWaitSet.addWaiter(packet.getId(), result);
-        });
+        responseWaitSet.addWaiter(packet.getId(), result);
+        channel.writeAndFlush(packet);
 
         return result;
     }
