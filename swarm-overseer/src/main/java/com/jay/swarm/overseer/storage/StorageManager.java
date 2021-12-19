@@ -28,6 +28,7 @@ public class StorageManager {
      */
     private final ConcurrentHashMap<String, StorageInfo> storages = new ConcurrentHashMap<>(256);
 
+    private static final long MAX_HEART_BEAT_DELAY = 10;
     /**
      * storage节点连接
      */
@@ -47,7 +48,7 @@ public class StorageManager {
     public List<StorageInfo> getAliveNodes(List<String> nodeIds){
         return storages.values().stream()
                 .filter(storage -> {
-                    return System.currentTimeMillis() - storage.getLastHeartBeatTime() < SwarmConstants.DEFAULT_HEARTBEAT_PERIOD &&
+                    return System.currentTimeMillis() - storage.getLastHeartBeatTime() < SwarmConstants.DEFAULT_HEARTBEAT_PERIOD + MAX_HEART_BEAT_DELAY &&
                             nodeIds.contains(storage.getId());
                 }).collect(Collectors.toList());
     }
