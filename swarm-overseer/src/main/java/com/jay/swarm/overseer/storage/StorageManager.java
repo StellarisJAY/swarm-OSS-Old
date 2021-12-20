@@ -41,7 +41,7 @@ public class StorageManager {
     public List<StorageInfo> listAliveNodes(){
         return storages.values().stream()
                 .filter(storage -> {
-                    return System.currentTimeMillis() - storage.getLastHeartBeatTime() < SwarmConstants.DEFAULT_HEARTBEAT_PERIOD;
+                    return System.currentTimeMillis() - storage.getLastHeartBeatTime() < SwarmConstants.DEFAULT_HEARTBEAT_PERIOD + MAX_HEART_BEAT_DELAY;
                 }).collect(Collectors.toList());
     }
 
