@@ -43,8 +43,9 @@ public class SwarmClient {
         FileTransferHandler transferHandler = new FileTransferHandler();
         SwarmClientHandler clientHandler = new SwarmClientHandler(transferHandler, serializer, DOWNLOAD_DIR);
         this.overseerClient.addHandler(clientHandler);
+        this.storageClient.addHandler(clientHandler);
         this.uploadHelper = new UploadHelper(overseerClient, storageClient, serializer, config);
-        this.downloadHelper = new DownloadHelper(overseerClient, serializer, config);
+        this.downloadHelper = new DownloadHelper(overseerClient, storageClient, serializer, config);
         init();
     }
 
@@ -98,7 +99,6 @@ public class SwarmClient {
            log.error("download process error: ", e);
        }
     }
-
 
 
 

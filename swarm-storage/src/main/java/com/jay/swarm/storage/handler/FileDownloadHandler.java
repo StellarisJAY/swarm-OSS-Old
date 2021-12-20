@@ -56,11 +56,11 @@ public class FileDownloadHandler {
             // 发送END
             NetworkPacket endPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
             endPacket.setId(packet.getId());
-            ctx.writeAndFlush(endPacket);
+            ctx.channel().writeAndFlush(endPacket);
         }catch (Exception e){
             e.printStackTrace();
             NetworkPacket errorPacket = NetworkPacket.builder().type(PacketTypes.ERROR).id(packet.getId()).content(e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET)).build();
-            ctx.writeAndFlush(errorPacket);
+            ctx.channel().writeAndFlush(errorPacket);
         }
 
     }

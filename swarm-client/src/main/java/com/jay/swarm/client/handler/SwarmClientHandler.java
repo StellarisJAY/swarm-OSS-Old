@@ -76,5 +76,6 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
         byte[] content = packet.getContent();
         String fileId = new String(content, SwarmConstants.DEFAULT_CHARSET);
         fileTransferHandler.handleTransferEnd(fileId);
+        context.fireChannelRead(packet);
     }
 }

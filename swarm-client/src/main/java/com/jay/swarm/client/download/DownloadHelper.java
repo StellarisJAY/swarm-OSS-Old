@@ -25,14 +25,17 @@ import java.util.List;
  */
 @Slf4j
 public class DownloadHelper {
-    private final BaseClient client;
+    private final BaseClient overseerClient;
+
+    private final BaseClient storageClient;
 
     private final Serializer serializer;
 
     private final Config config;
 
-    public DownloadHelper(BaseClient client, Serializer serializer, Config config) {
-        this.client = client;
+    public DownloadHelper(BaseClient overseerClient, BaseClient storageClient, Serializer serializer, Config config) {
+        this.overseerClient = overseerClient;
+        this.storageClient = storageClient;
         this.serializer = serializer;
         this.config = config;
     }
@@ -46,7 +49,7 @@ public class DownloadHelper {
         }
         // 发送下载请求
         NetworkPacket packet = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
-        NetworkPacket response = (NetworkPacket)client.sendAsync(host, Integer.parseInt(port), packet).get();
+        NetworkPacket response = (NetworkPacket)overseerClient.sendAsync(host, Integer.parseInt(port), packet).get();
 
         // 收到异常返回
         if(response.getType() == PacketTypes.ERROR){
@@ -62,13 +65,13 @@ public class DownloadHelper {
         byte[] md5 = fileInfo.getMd5();
         List<StorageInfo> storages = fileInfo.getStorages();
 
-        StorageInfo targetStorage = StorageNodeSelector.select(storages);
+        StorageInfo targetStorage = StorageNodeSelector.selectRandom(storages);
 
         String host = targetStorage.getHost();
         int port = targetStorage.getPort();
 
         NetworkPacket request = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
-        NetworkPacket response = (NetworkPacket)client.sendAsync(host, port, request).get();
+        NetworkPacket response = (NetworkPacket)storageClient.sendAsync(host, port, request).get();
 
         if(response.getType() == PacketTypes.ERROR){
             throw new RuntimeException(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));
