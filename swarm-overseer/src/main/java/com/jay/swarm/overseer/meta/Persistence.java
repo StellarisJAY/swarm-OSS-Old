@@ -103,10 +103,14 @@ public class Persistence {
                 int length = channel.read(buffer);
                 buffer.rewind();
                 AppendableByteArray byteArray = new AppendableByteArray();
-                while(length > 0){
+                int line = 0;
+                int lastR = -2;
+                int index = 0;
+                while(index < length){
                     byte b = buffer.get();
-                    if(b == (byte)'\r'){
+                    if(b == (byte)'\n' && lastR == index - 1){
                         try{
+                            line++;
                             // 读取一行字节
                             byte[] serialized = byteArray.array();
                             // 反序列化
@@ -114,14 +118,17 @@ public class Persistence {
                             metaDataManager.putMetaData(metaData);
                             loaded++;
                         }catch (Exception e){
+                            log.error("wrong p line ", e);
                             log.debug("wrong persistence line skipped");
                         }finally {
                             byteArray.flush();
                         }
-                    }else{
+                    }else if(b == (byte)'\r'){
+                          lastR = index;
+                    } else{
                         byteArray.append(b);
                     }
-                    length--;
+                    index++;
                 }
                 channel.close();
                 buffer.clear();
@@ -144,19 +151,18 @@ public class Persistence {
             FileChannel channel = outputStream.getChannel();
             // 每个metaData序列化后写入文件
             for(MetaData meta : metaData){
-                if(!meta.getStorages().isEmpty()){
-                    // 序列化
-                    byte[] serialized = serializer.serialize(meta, MetaData.class);
-                    // 创建buffer，大小为序列化后字节数 + 换行符
-                    ByteBuffer buffer = ByteBuffer.allocate(serialized.length + 1);
-                    buffer.put(serialized);
-                    buffer.put((byte)'\r');
-                    buffer.rewind();
-                    // 写入channel
-                    channel.write(buffer);
-                    buffer.clear();
-                    savedMeta++;
-                }
+                // 序列化
+                byte[] serialized = serializer.serialize(meta, MetaData.class);
+                // 创建buffer，大小为序列化后字节数 + 换行符
+                ByteBuffer buffer = ByteBuffer.allocate(serialized.length + 2);
+                buffer.put(serialized);
+                buffer.put((byte)'\r');
+                buffer.put((byte)'\n');
+                buffer.rewind();
+                // 写入channel
+                channel.write(buffer);
+                buffer.clear();
+                savedMeta++;
             }
             channel.close();
         }catch (IOException e){
