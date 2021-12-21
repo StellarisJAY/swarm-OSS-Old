@@ -4,4 +4,4 @@
 
 ![](https://images-1257369645.cos.ap-chengdu.myqcloud.com/swarm-docs/swarm-oss-overview.png)
 
-![](https://images-1257369645.cos.ap-chengdu.myqcloud.com/swarm-docs/swarm-oss-backup.png)
+![](https://images-1257369645.cos.ap-chengdu.myqcloud.com/swarm-docs/swarm-backup.png)
