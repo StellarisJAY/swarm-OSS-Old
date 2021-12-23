@@ -136,7 +136,7 @@ public final class UploadHelper {
         byte[] headSerialized = serializer.serialize(fileInfo, FileInfo.class);
         NetworkPacket headPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, headSerialized);
         // 发送HEAD
-        storageClient.sendAsync(targetStorageNode.getHost(), targetStorageNode.getPort(), headPacket);
+        storageClient.sendAsync(targetStorageNode.getHost(), targetStorageNode.getPort(), headPacket).get();
 
         /*
             文件分片

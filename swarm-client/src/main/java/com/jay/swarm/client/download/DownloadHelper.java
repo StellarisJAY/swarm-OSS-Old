@@ -4,7 +4,6 @@ import com.jay.swarm.client.storage.StorageNodeSelector;
 import com.jay.swarm.common.config.Config;
 import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.entity.DownloadResponse;
-import com.jay.swarm.common.entity.MetaData;
 import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.entity.NetworkPacket;
@@ -13,6 +12,7 @@ import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.common.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -72,6 +72,7 @@ public class DownloadHelper {
 
         NetworkPacket request = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
         NetworkPacket response = (NetworkPacket)storageClient.sendAsync(host, port, request).get();
+        File file = new File("D:/swarm/downloads/" + fileId);
 
         if(response.getType() == PacketTypes.ERROR){
             throw new RuntimeException(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));

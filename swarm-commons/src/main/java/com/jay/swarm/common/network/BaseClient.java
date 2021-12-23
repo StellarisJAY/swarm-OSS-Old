@@ -1,8 +1,11 @@
 package com.jay.swarm.common.network;
 
+import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.handler.BaseClientHandler;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -122,5 +125,16 @@ public class BaseClient {
         CHANNEL_MAP.values().forEach(ChannelOutboundInvoker::close);
         // 关闭线程组
         group.shutdownGracefully();
+    }
+
+    public CompletableFuture<Object> sendAsync(String host, int port, short type, ByteBuf data) throws ConnectException {
+        Channel channel = connect(host, port);
+        CompletableFuture<Object> result = new CompletableFuture<>();
+        int id = idProvider.getAndIncrement();
+        responseWaitSet.addWaiter(id, result);
+        ByteBuf header = NetworkPacket.header(id, type, data.readableBytes());
+        ByteBuf packet = NetworkPacket.encode(header, data);
+        channel.writeAndFlush(packet);
+        return result;
     }
 }

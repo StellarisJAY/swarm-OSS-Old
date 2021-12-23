@@ -6,11 +6,12 @@ import com.jay.swarm.common.util.FileUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
@@ -40,10 +41,6 @@ public class FileAppender {
     private final FileTransferCallback transferCallback;
 
     /**
-     * 文件输出流
-     */
-    private final FileOutputStream outputStream;
-    /**
      * 文件输出通道
      */
     private final FileChannel fileChannel;
@@ -67,14 +64,15 @@ public class FileAppender {
         this.path = path;
         this.transferCallback = new DefaultFileTransferCallback();
         File file = new File(path);
+
         // 创建文件的父目录
         File parent = file.getParentFile();
         if(!parent.exists() && !parent.mkdirs()){
             throw new RuntimeException("unable to create parent path");
         }
-        this.outputStream = new FileOutputStream(file);
-        this.fileChannel = outputStream.getChannel();
-        this.fileChannel.position(0);
+        RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
+        this.fileChannel = randomAccessFile.getChannel();
+
         this.transferStartTime = System.currentTimeMillis();
     }
 
@@ -97,6 +95,19 @@ public class FileAppender {
         // 进度回调
         transferCallback.onProgress(fileId, totalSize, receivedSize, progress);
     }
+
+    public void write(long position, byte[] data) throws IOException {
+        MappedByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, position, data.length);
+        buffer.put(data);
+        // 计算接收大小和接收进度
+        receivedSize += data.length;
+        float progress = new BigDecimal(receivedSize).multiply(new BigDecimal(100))
+                .divide(new BigDecimal(totalSize), 2, RoundingMode.HALF_DOWN)
+                .floatValue();
+        // 进度回调
+        transferCallback.onProgress(fileId, totalSize, receivedSize, progress);
+    }
+
 
     /**
      * 完成传输
@@ -129,12 +140,6 @@ public class FileAppender {
                 log.error("error when closing fileChannel", e);
             }
         }
-        if(outputStream != null){
-            try{
-                outputStream.close();
-            }catch (IOException e){
-                log.error("error when closing outputStream", e);
-            }
-        }
+
     }
 }

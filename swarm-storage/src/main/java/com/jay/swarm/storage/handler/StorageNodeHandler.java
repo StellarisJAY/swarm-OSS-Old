@@ -19,7 +19,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 /**
  * <p>
@@ -130,16 +129,17 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
      * 处理文件数据
      * @param context 上下文
      * @param packet NetworkPacket
-     * @throws IOException IOException
+     * @throws Exception Exception
      */
-    private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
+    private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws Exception {
         // 反序列化分片
         byte[] content = packet.getContent();
-        byte[] idBytes = Arrays.copyOfRange(content, 0, 36);
-        String fileId = new String(idBytes, SwarmConstants.DEFAULT_CHARSET);
-        byte[] fileContent = Arrays.copyOfRange(content, 36, content.length);
+        byte[] idBytes = new byte[36];
+        byte[] data = new byte[content.length - 36];
+        System.arraycopy(content, 0, idBytes, 0, idBytes.length);
+        System.arraycopy(content, 36, data, 0, data.length);
         // 处理分片
-        fileTransferHandler.handleTransferBody(fileId, fileContent);
+        fileTransferHandler.handleTransferBody(new String(idBytes, SwarmConstants.DEFAULT_CHARSET), data);
         // 回复报文
         NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
         context.channel().writeAndFlush(response);

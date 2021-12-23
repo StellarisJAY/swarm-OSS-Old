@@ -1,13 +1,15 @@
 package com.jay.swarm.common.network.entity;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
 /**
  * <p>
- * Swarm-dfs网络通信基础报文。
+ * Swarm-oss网络通信基础报文。
  *
  * 0    1    2    3    4    5    6    7    8    9    10   11   12
  * +----+----+----+----+----+----+----+----+----+----+----+----+
@@ -67,6 +69,27 @@ public class NetworkPacket {
         if(packet.content != null){
             buffer.writeBytes(packet.content);
         }
+    }
+
+    public static ByteBuf buildPacketOfType(short type, ByteBuf data){
+        ByteBuf header = header(0, type, data.readableBytes());
+        return encode(header, data);
+    }
+
+    public static ByteBuf header(int id, short type, int dataLength){
+        ByteBuf header = Unpooled.buffer();
+        header.writeShort(MAGIC_NUMBER);
+        header.writeInt(HEADER_LENGTH + dataLength);
+        header.writeShort(type);
+        header.writeInt(id);
+        return header;
+    }
+
+    public static ByteBuf encode(ByteBuf header, ByteBuf data){
+        CompositeByteBuf compositeBuffer = Unpooled.compositeBuffer();
+        compositeBuffer.addComponent(true, header);
+        compositeBuffer.addComponent(true, data);
+        return compositeBuffer;
     }
 
     /**
