@@ -128,7 +128,7 @@ public class MetaDataHandler {
             // 元数据中添加该存储节点
             metaData.getStorages().add(fileMetaStorage.getStorageId());
 
-            NetworkPacket response = NetworkPacket.buildPacketOfType(PacketTypes.SUCCESS, null);
+            NetworkPacket response = NetworkPacket.buildPacketOfType(PacketTypes.SUCCESS, new byte[0]);
             response.setId(packet.getId());
             return response;
         }catch (Exception e){
