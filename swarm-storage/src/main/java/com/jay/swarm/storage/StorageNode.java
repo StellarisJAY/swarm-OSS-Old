@@ -47,7 +47,7 @@ public class StorageNode {
     private final String host;
     private final int port;
     private final FileInfoCache fileInfoCache;
-    private final String STORAGE_PATH;
+    private final String storagePath;
 
     private final FileLocator locator;
 
@@ -58,7 +58,7 @@ public class StorageNode {
         this.config = config;
         // 配置文件加载存储根目录
         String storagePath = config.get("storage.root");
-        this.STORAGE_PATH = StringUtils.isEmpty(storagePath) ? DEFAULT_STORAGE_PATH : storagePath;
+        this.storagePath = StringUtils.isEmpty(storagePath) ? DEFAULT_STORAGE_PATH : storagePath;
         // 生成节点ID
         this.nodeId = UUID.randomUUID().toString();
         this.overseerClient = new BaseClient();
@@ -66,7 +66,7 @@ public class StorageNode {
         // 默认序列化工具
         this.serializer = new ProtoStuffSerializer();
         // 文件定位器
-        locator = new Md5FileLocator(this.STORAGE_PATH);
+        locator = new Md5FileLocator(this.storagePath);
         // 文件信息缓存
         fileInfoCache = new FileInfoCache(locator);
 
@@ -131,7 +131,6 @@ public class StorageNode {
      */
     public void registerNode(String host, int port) throws Exception {
         try{
-            long registerStart = System.currentTimeMillis();
             // 节点信息
             StorageInfo storageInfo = getStorageInfo();
             // 加载ID
@@ -144,7 +143,8 @@ public class StorageNode {
             // 等待Overseer服务器回应
             NetworkPacket response = (NetworkPacket) future.get(10, TimeUnit.SECONDS);
             if(response.getType() == PacketTypes.ERROR){
-                throw new RuntimeException(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));
+                String message = new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET);
+                throw new RuntimeException(message);
             }
             else{
                 // 由Overseer分配的ID
@@ -195,7 +195,8 @@ public class StorageNode {
                     等待Overseer的心跳回应
                  */
                 long s = System.currentTimeMillis();
-                Object response = future.get(SwarmConstants.DEFAULT_HEARTBEAT_PERIOD, TimeUnit.MILLISECONDS);
+                NetworkPacket response = (NetworkPacket)future.get(SwarmConstants.DEFAULT_HEARTBEAT_PERIOD, TimeUnit.MILLISECONDS);
+                response.release();
                 log.debug("heart-beat finished , time used: {}ms", (System.currentTimeMillis() - s));
             } catch (ExecutionException | InterruptedException e) {
                 log.error("heart-beat ends with exception", e);
@@ -267,5 +268,9 @@ public class StorageNode {
         Config config = new Config(args[0]);
         StorageNode storageNode = new StorageNode(config);
         storageNode.init();
+    }
+
+    public String getStoragePath() {
+        return storagePath;
     }
 }
