@@ -28,7 +28,6 @@ import java.net.ConnectException;
 public class SwarmClient {
     private final BaseClient overseerClient;
     private final BaseClient storageClient;
-    private final Serializer serializer;
     private final Config config;
     private final UploadHelper uploadHelper;
     private final DownloadHelper downloadHelper;
@@ -39,7 +38,7 @@ public class SwarmClient {
         this.config = config;
         this.overseerClient = new BaseClient();
         this.storageClient = new BaseClient();
-        this.serializer = new ProtoStuffSerializer();
+        Serializer serializer = new ProtoStuffSerializer();
         FileTransferHandler transferHandler = new FileTransferHandler();
         SwarmClientHandler clientHandler = new SwarmClientHandler(transferHandler, serializer, DOWNLOAD_DIR);
         this.overseerClient.addHandler(clientHandler);
@@ -100,7 +99,9 @@ public class SwarmClient {
        }
     }
 
-
+    public Config getConfig(){
+        return config;
+    }
 
     public void shutdownGracefully(){
         overseerClient.shutdown();

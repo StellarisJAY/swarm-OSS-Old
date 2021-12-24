@@ -82,6 +82,7 @@ public class BackupHelper {
     }
 
     private void sendBackup(FileInfo fileInfo, String path, List<StorageInfo> storages){
+
         if(storages != null && !storages.isEmpty()){
             /*
                 轮询尝试方式向一个节点发送备份
@@ -108,10 +109,11 @@ public class BackupHelper {
                     NetworkPacket headResponse = (NetworkPacket) peerNodeClient.sendAsync(host, port, head).get();
                     if(headResponse.getType() == PacketTypes.ERROR){
                         throw new RuntimeException(new String(headResponse.getContent(), SwarmConstants.DEFAULT_CHARSET));
+                    }else{
+                        headResponse.release();
                     }
-
                     // 发送文件数据
-                    ShardedFileSender shardedFileSender = new ShardedFileSender(peerNodeClient, serializer, new DefaultFileTransferCallback());
+                    ShardedFileSender shardedFileSender = new ShardedFileSender(peerNodeClient, new DefaultFileTransferCallback());
                     shardedFileSender.send(host, port, new File(path), fileInfo.getFileId());
 
                     // 封装END报文
@@ -123,7 +125,7 @@ public class BackupHelper {
                     NetworkPacket end = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, serializedEnd);
                     // 发送END，等待最终返回
                     NetworkPacket finalResponse = (NetworkPacket) peerNodeClient.sendAsync(host, port, end).get();
-
+                    finalResponse.release();
                     if(finalResponse.getType() == PacketTypes.SUCCESS){
                         log.info("backup synchronized to peer storage node, time used {} ms", (System.currentTimeMillis() - start));
                         // 备份成功，结束循环

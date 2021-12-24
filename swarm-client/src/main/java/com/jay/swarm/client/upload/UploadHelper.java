@@ -10,7 +10,6 @@ import com.jay.swarm.common.entity.StorageInfo;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.network.BaseClient;
 import com.jay.swarm.common.network.ShardedFileSender;
-import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
@@ -93,6 +92,8 @@ public final class UploadHelper {
             if(uploadFileResponse.getType() == PacketTypes.ERROR){
                 String message = new String(uploadFileResponse.getContent(), SwarmConstants.DEFAULT_CHARSET);
                 throw new IllegalStateException(message);
+            }else{
+                uploadFileResponse.release();
             }
             // 最后返回文件ID
             return fileId;
@@ -136,12 +137,13 @@ public final class UploadHelper {
         byte[] headSerialized = serializer.serialize(fileInfo, FileInfo.class);
         NetworkPacket headPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_HEAD, headSerialized);
         // 发送HEAD
-        storageClient.sendAsync(targetStorageNode.getHost(), targetStorageNode.getPort(), headPacket).get();
+        NetworkPacket respHead = (NetworkPacket) storageClient.sendAsync(targetStorageNode.getHost(), targetStorageNode.getPort(), headPacket).get();
+        respHead.release();
 
         /*
             文件分片
          */
-        ShardedFileSender shardedFileSender = new ShardedFileSender(storageClient, serializer, callback);
+        ShardedFileSender shardedFileSender = new ShardedFileSender(storageClient, callback);
         // 发送分片
         shardedFileSender.send(targetStorageNode.getHost(), targetStorageNode.getPort(), file, fileId);
 
@@ -197,6 +199,7 @@ public final class UploadHelper {
         // 发送上传请求，等待结果
         NetworkPacket result =  (NetworkPacket) overseerClient.sendAsync(host, Integer.parseInt(port), requestPacket).get();
         log.info("{} upload meta finished, time used {} ms", path, (System.currentTimeMillis() - uploadMetaStart));
+
         return result;
     }
 }

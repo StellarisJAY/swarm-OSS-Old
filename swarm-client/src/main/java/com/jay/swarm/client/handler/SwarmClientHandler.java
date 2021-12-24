@@ -6,6 +6,7 @@ import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.Serializer;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -39,7 +40,7 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, NetworkPacket packet) throws Exception {
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, NetworkPacket packet) {
         try{
             short type = packet.getType();
             switch (type){
@@ -52,6 +53,7 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
             if(log.isDebugEnabled()){
                 log.debug("client handler error", e);
             }
+            packet.release();
         }
     }
 
@@ -60,16 +62,16 @@ public class SwarmClientHandler extends SimpleChannelInboundHandler<NetworkPacke
         FileInfo fileInfo = serializer.deserialize(content, FileInfo.class);
         String path = baseDir + File.separator + fileInfo.getFileId();
         fileTransferHandler.handleTransferHead(fileInfo, path);
+        context.fireChannelRead(packet);
     }
 
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws IOException {
-        byte[] content = packet.getContent();
+        ByteBuf data = packet.getData();
         byte[] idBytes = new byte[36];
-        byte[] data = new byte[content.length - 36];
-        System.arraycopy(content, 0, idBytes, 0, idBytes.length);
-        System.arraycopy(content, 36, data, 0, data.length);
+        data.readBytes(idBytes);
         // 处理分片
         fileTransferHandler.handleTransferBody(new String(idBytes, SwarmConstants.DEFAULT_CHARSET), data);
+        context.fireChannelRead(packet);
     }
 
     private void handleTransferEnd(ChannelHandlerContext context, NetworkPacket packet){

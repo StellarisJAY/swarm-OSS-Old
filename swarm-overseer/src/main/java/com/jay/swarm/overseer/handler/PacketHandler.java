@@ -77,24 +77,29 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, NetworkPacket packet) {
         short packetType = packet.getType();
-        NetworkPacket response = null;
-        // 根据报文类型做不同处理，最终得到一个Response packet
-        switch(packetType){
-            // 注册存储节点
-            case PacketTypes.STORAGE_REGISTER: response = storageHandler.handleStorageRegister(packet, ctx.channel());break;
-            // 存储节点心跳
-            case PacketTypes.HEART_BEAT: response = storageHandler.handleStorageHeartBeat(packet, ctx.channel()); break;
-            // 上传请求
-            case PacketTypes.UPLOAD_REQUEST: response = metaDataHandler.handleUploadRequest(packet); break;
-            // 更新meta
-            case PacketTypes.UPDATE_FILE_META_STORAGE: response = metaDataHandler.updateFileMeta(packet); break;
-            // 下载请求
-            case PacketTypes.DOWNLOAD_REQUEST: response = handleDownloadRequest(packet);break;
-            default:break;
-        }
-        if(response != null){
-            // 发送response
-            ctx.channel().writeAndFlush(response);
+        try{
+            NetworkPacket response = null;
+            // 根据报文类型做不同处理，最终得到一个Response packet
+            switch(packetType){
+                // 注册存储节点
+                case PacketTypes.STORAGE_REGISTER: response = storageHandler.handleStorageRegister(packet, ctx.channel());break;
+                // 存储节点心跳
+                case PacketTypes.HEART_BEAT: response = storageHandler.handleStorageHeartBeat(packet, ctx.channel()); break;
+                // 上传请求
+                case PacketTypes.UPLOAD_REQUEST: response = metaDataHandler.handleUploadRequest(packet); break;
+                // 更新meta
+                case PacketTypes.UPDATE_FILE_META_STORAGE: response = metaDataHandler.updateFileMeta(packet); break;
+                // 下载请求
+                case PacketTypes.DOWNLOAD_REQUEST: response = handleDownloadRequest(packet);packet.release();break;
+                default:break;
+            }
+            if(response != null){
+                // 发送response
+                ctx.channel().writeAndFlush(response);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+            packet.release();
         }
     }
 

@@ -6,6 +6,7 @@ import io.netty.buffer.Unpooled;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * <p>
@@ -34,11 +35,14 @@ import lombok.ToString;
 @Builder
 @Getter
 @ToString
+@Slf4j
 public class NetworkPacket {
     private int length;
     private short type;
     private byte[] content;
     private int id;
+    private ByteBuf header;
+    private ByteBuf data;
 
     /**
      * 首部Magic Number
@@ -73,9 +77,16 @@ public class NetworkPacket {
 
     public static ByteBuf buildPacketOfType(short type, ByteBuf data){
         ByteBuf header = header(0, type, data.readableBytes());
-        return encode(header, data);
+        return combine(header, data);
     }
 
+    /**
+     * 生成HEADER
+     * @param id id
+     * @param type 类型
+     * @param dataLength 数据长度
+     * @return ByteBuf
+     */
     public static ByteBuf header(int id, short type, int dataLength){
         ByteBuf header = Unpooled.buffer();
         header.writeShort(MAGIC_NUMBER);
@@ -85,7 +96,13 @@ public class NetworkPacket {
         return header;
     }
 
-    public static ByteBuf encode(ByteBuf header, ByteBuf data){
+    /**
+     * 合并HEADER和DATA
+     * @param header header
+     * @param data data
+     * @return ByteBuf
+     */
+    public static ByteBuf combine(ByteBuf header, ByteBuf data){
         CompositeByteBuf compositeBuffer = Unpooled.compositeBuffer();
         compositeBuffer.addComponent(true, header);
         compositeBuffer.addComponent(true, data);
@@ -99,33 +116,48 @@ public class NetworkPacket {
      */
     public static NetworkPacket decode(ByteBuf buffer){
         // 报文小于header长度或者魔数错误
-        if(buffer.readableBytes() < HEADER_LENGTH || !checkMagicNumber(buffer)){
+        if(buffer.readableBytes() < HEADER_LENGTH){
             throw new RuntimeException("invalid network packet");
         }
+        // 切割buffer，得到HEADER和DATA
+        ByteBuf header = buffer.slice(0, HEADER_LENGTH);
+
+        if(!checkMagicNumber(header)){
+            throw new RuntimeException("invalid network packet");
+        }
+        ByteBuf data = buffer.slice(HEADER_LENGTH, buffer.readableBytes() - HEADER_LENGTH);
         // 读取长度
-        int length = buffer.readInt();
+        int length = header.readInt();
         // 读取类型
-        short type = buffer.readShort();
+        short type = header.readShort();
         // 读取ID
-        int id = buffer.readInt();
+        int id = header.readInt();
 
         // 总长度-头部长度 = 数据部分长度
         int contentLength = length - HEADER_LENGTH;
         // ByteBuf中剩余字节数不够
-        if(contentLength > buffer.readableBytes()){
+        if(contentLength > data.readableBytes()){
             throw new RuntimeException("packet format error");
         }
-        // 读取content
-        byte[] content = new byte[contentLength];
-        buffer.readBytes(content);
-
-        buffer.release();
-
         return builder().length(length)
                 .type(type)
                 .id(id)
-                .content(content)
+                .data(data)
+                .header(header)
                 .build();
+    }
+
+    public byte[] getContent(){
+        if(content == null){
+            if(data.isDirect()){
+                content = new byte[data.readableBytes()];
+                data.readBytes(content);
+                data.release();
+            }else{
+                content = data.array();
+            }
+        }
+        return content;
     }
 
     /**
@@ -153,4 +185,10 @@ public class NetworkPacket {
                 .content(content)
                 .build();
     }
+
+    public void release(){
+        data.release();
+    }
+
+
 }
