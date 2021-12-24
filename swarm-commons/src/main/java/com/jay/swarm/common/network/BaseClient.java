@@ -1,14 +1,13 @@
 package com.jay.swarm.common.network;
 
-import com.jay.swarm.common.constants.SwarmConstants;
 import com.jay.swarm.common.network.entity.NetworkPacket;
 import com.jay.swarm.common.network.handler.BaseClientHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.ResourceLeakDetector;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.ConnectException;
@@ -79,6 +78,7 @@ public class BaseClient {
                         .channel(NioSocketChannel.class)
                         .handler(channelInitializer)
                         .remoteAddress(new InetSocketAddress(host, port));
+                ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
                 addHandler(new BaseClientHandler(responseWaitSet));
                 // 建立连接
                 ChannelFuture channelFuture = bootstrap.connect().sync();
@@ -133,7 +133,7 @@ public class BaseClient {
         int id = idProvider.getAndIncrement();
         responseWaitSet.addWaiter(id, result);
         ByteBuf header = NetworkPacket.header(id, type, data.readableBytes());
-        ByteBuf packet = NetworkPacket.encode(header, data);
+        ByteBuf packet = NetworkPacket.combine(header, data);
         channel.writeAndFlush(packet);
         return result;
     }

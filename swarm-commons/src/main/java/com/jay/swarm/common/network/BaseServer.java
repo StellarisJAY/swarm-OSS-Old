@@ -5,6 +5,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.ResourceLeakDetector;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
@@ -38,7 +39,8 @@ public class BaseServer {
             ServerBootstrap serverBootstrap = new ServerBootstrap().group(boss, worker)
                     .channel(NioServerSocketChannel.class)
                     .childHandler(channelInitializer);
-
+            // 内存泄漏检测
+            ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
             ChannelFuture channelFuture = serverBootstrap.bind(port).sync();
             log.info("server started");
         } catch (InterruptedException e) {
