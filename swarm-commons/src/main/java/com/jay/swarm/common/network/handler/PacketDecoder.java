@@ -37,11 +37,11 @@ public class PacketDecoder extends LengthFieldBasedFrameDecoder {
             Object object = super.decode(ctx, in);
             if(object instanceof ByteBuf){
                 // 解码出NetworkPacket
-                NetworkPacket packet = NetworkPacket.decode((ByteBuf) object);
-                return packet;
+                return NetworkPacket.decode((ByteBuf) object);
             }
         }catch (Exception e){
             log.error("packet decode error: ", e);
+            in.release();
         }
         return null;
     }

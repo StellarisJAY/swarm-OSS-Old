@@ -3,6 +3,7 @@ package com.jay.swarm.common.network.handler;
 import com.jay.swarm.common.fs.FileAppender;
 import com.jay.swarm.common.fs.FileInfo;
 import com.jay.swarm.common.fs.FileInfoCache;
+import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.FileNotFoundException;
@@ -53,7 +54,7 @@ public class FileTransferHandler {
         }
     }
 
-
+    @Deprecated
     public void handleTransferBody(String fileId, byte[] content) throws IOException {
         // 添加分片到文件拼接器
         FileAppender appender = appenderMap.get(fileId);
@@ -61,6 +62,15 @@ public class FileTransferHandler {
             throw new FileNotFoundException("no file appender found");
         }
         appender.append(content);
+    }
+
+    public void handleTransferBody(String fileId, ByteBuf data) throws IOException {
+        // 添加分片到文件拼接器
+        FileAppender appender = appenderMap.get(fileId);
+        if(appender == null){
+            throw new FileNotFoundException("no file appender found");
+        }
+        appender.append(data);
     }
 
 

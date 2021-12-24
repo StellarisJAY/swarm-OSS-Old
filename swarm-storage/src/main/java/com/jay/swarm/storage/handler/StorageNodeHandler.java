@@ -13,6 +13,7 @@ import com.jay.swarm.common.network.entity.PacketTypes;
 import com.jay.swarm.common.network.handler.FileTransferHandler;
 import com.jay.swarm.common.serialize.Serializer;
 import com.jay.swarm.storage.backup.BackupHelper;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -88,13 +89,13 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
                 case PacketTypes.TRANSFER_FILE_HEAD:
                     handleTransferHead(channelHandlerContext, packet);break;
                 // 处理文件数据部分
-                case PacketTypes.TRANSFER_FILE_BODY: handleTransferBody(channelHandlerContext, packet);break;
+                case PacketTypes.TRANSFER_FILE_BODY: handleTransferBody(channelHandlerContext, packet);packet.release();break;
                 // 处理文件传输结束
                 case PacketTypes.TRANSFER_FILE_END: handleTransferEnd(channelHandlerContext, packet);break;
                 // 处理下载请求
                 case PacketTypes.DOWNLOAD_REQUEST:
-                    downloadHandler.handleDownloadRequest(channelHandlerContext, packet);
-                default:break;
+                    downloadHandler.handleDownloadRequest(channelHandlerContext, packet);packet.release();break;
+                default:channelHandlerContext.fireChannelRead(packet);break;
             }
         }catch (Exception e){
             // 处理过程异常
@@ -103,6 +104,7 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
                     e.getMessage().getBytes(SwarmConstants.DEFAULT_CHARSET));
             errorResponse.setId(packet.getId());
             channelHandlerContext.channel().writeAndFlush(errorResponse);
+            packet.release();
         }
     }
 
@@ -121,7 +123,8 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
         // 具体处理过程
         fileTransferHandler.handleTransferHead(fileInfo, path);
         // 封装response
-        NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
+        NetworkPacket response = NetworkPacket.buildPacketOfType(PacketTypes.SUCCESS, new byte[0]);
+        response.setId(packet.getId());
         context.channel().writeAndFlush(response);
     }
 
@@ -133,13 +136,12 @@ public class StorageNodeHandler extends SimpleChannelInboundHandler<NetworkPacke
      */
     private void handleTransferBody(ChannelHandlerContext context, NetworkPacket packet) throws Exception {
         // 反序列化分片
-        byte[] content = packet.getContent();
+        ByteBuf data = packet.getData();
         byte[] idBytes = new byte[36];
-        byte[] data = new byte[content.length - 36];
-        System.arraycopy(content, 0, idBytes, 0, idBytes.length);
-        System.arraycopy(content, 36, data, 0, data.length);
+        data.readBytes(idBytes);
         // 处理分片
         fileTransferHandler.handleTransferBody(new String(idBytes, SwarmConstants.DEFAULT_CHARSET), data);
+
         // 回复报文
         NetworkPacket response = NetworkPacket.builder().id(packet.getId()).type(PacketTypes.TRANSFER_RESPONSE).build();
         context.channel().writeAndFlush(response);

@@ -3,6 +3,7 @@ package com.jay.swarm.common.fs;
 import com.jay.swarm.common.network.callback.DefaultFileTransferCallback;
 import com.jay.swarm.common.network.callback.FileTransferCallback;
 import com.jay.swarm.common.util.FileUtil;
+import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -89,6 +90,18 @@ public class FileAppender {
         buffer.clear();
         // 计算接收大小和接收进度
         receivedSize += data.length;
+        float progress = new BigDecimal(receivedSize).multiply(new BigDecimal(100))
+                .divide(new BigDecimal(totalSize), 2, RoundingMode.HALF_DOWN)
+                .floatValue();
+        // 进度回调
+        transferCallback.onProgress(fileId, totalSize, receivedSize, progress);
+    }
+
+    public void append(ByteBuf data) throws IOException {
+        ByteBuffer buffer = data.nioBuffer();
+        int length = fileChannel.write(buffer);
+        // 计算接收大小和接收进度
+        receivedSize += length;
         float progress = new BigDecimal(receivedSize).multiply(new BigDecimal(100))
                 .divide(new BigDecimal(totalSize), 2, RoundingMode.HALF_DOWN)
                 .floatValue();

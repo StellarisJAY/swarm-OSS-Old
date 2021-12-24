@@ -43,7 +43,8 @@ public class DefaultFileTransferCallback implements FileTransferCallback {
     }
 
     private String calculateSpeed(long size, long time){
-        double speed = (double)size * 1000 / time;
+
+        double speed = time == 0 ? size : (double)size / time;
         BigDecimal s = new BigDecimal(speed);
         if(speed < 1024){
             return speed + " byte/s";

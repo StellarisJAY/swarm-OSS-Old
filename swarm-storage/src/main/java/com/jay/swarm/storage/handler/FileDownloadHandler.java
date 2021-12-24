@@ -51,7 +51,7 @@ public class FileDownloadHandler {
 
             // 发送文件BODY
             File file = new File(path);
-            ShardedFileSender shardedFileSender = new ShardedFileSender(ctx.channel(), serializer, new DefaultFileTransferCallback());
+            ShardedFileSender shardedFileSender = new ShardedFileSender(ctx.channel(), new DefaultFileTransferCallback());
             shardedFileSender.send(file, fileId);
             // 发送END
             NetworkPacket endPacket = NetworkPacket.buildPacketOfType(PacketTypes.TRANSFER_FILE_END, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
