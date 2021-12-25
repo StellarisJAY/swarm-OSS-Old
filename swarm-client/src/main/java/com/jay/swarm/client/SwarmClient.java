@@ -88,10 +88,10 @@ public class SwarmClient {
         return uploadHelper.upload(path, backupCount, new DefaultFileTransferCallback());
     }
 
-    public void download(String fileId){
+    public void download(String fileId, String downloadDir){
        try{
            DownloadResponse response = downloadHelper.sendDownloadRequest(fileId);
-           downloadHelper.pullData(response);
+           downloadHelper.pullData(response, downloadDir);
        }catch (ConnectException e){
            log.error("unable to reach target Node, please check Node status, error:", e);
        }catch (Exception e){

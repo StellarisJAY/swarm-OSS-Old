@@ -90,7 +90,7 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
                 // 更新meta
                 case PacketTypes.UPDATE_FILE_META_STORAGE: response = metaDataHandler.updateFileMeta(packet); break;
                 // 下载请求
-                case PacketTypes.DOWNLOAD_REQUEST: response = handleDownloadRequest(packet);packet.release();break;
+                case PacketTypes.DOWNLOAD_REQUEST: response = handleDownloadRequest(packet);break;
                 default:break;
             }
             if(response != null){
@@ -131,6 +131,7 @@ public class PacketHandler extends SimpleChannelInboundHandler<NetworkPacket> {
                     .md5(metaData.getMd5())
                     .size(metaData.getSize())
                     .fileId(fileId)
+                    .filename(metaData.getFilename())
                     .storages(aliveNodes)
                     .build();
 
