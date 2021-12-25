@@ -19,6 +19,7 @@ import java.util.List;
 @ToString
 public class DownloadResponse {
     private String fileId;
+    private String filename;
     private byte[] md5;
     private long size;
 

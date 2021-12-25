@@ -109,6 +109,7 @@ public class FileAppender {
         transferCallback.onProgress(fileId, totalSize, receivedSize, progress);
     }
 
+    @Deprecated
     public void write(long position, byte[] data) throws IOException {
         MappedByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, position, data.length);
         buffer.put(data);

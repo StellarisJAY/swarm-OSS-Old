@@ -60,9 +60,8 @@ public class DownloadHelper {
         return serializer.deserialize(content, DownloadResponse.class);
     }
 
-    public void pullData(DownloadResponse fileInfo) throws Exception{
+    public void pullData(DownloadResponse fileInfo, String downloadDir) throws Exception{
         String fileId = fileInfo.getFileId();
-        byte[] md5 = fileInfo.getMd5();
         List<StorageInfo> storages = fileInfo.getStorages();
 
         StorageInfo targetStorage = StorageNodeSelector.selectRandom(storages);
@@ -72,7 +71,8 @@ public class DownloadHelper {
 
         NetworkPacket request = NetworkPacket.buildPacketOfType(PacketTypes.DOWNLOAD_REQUEST, fileId.getBytes(SwarmConstants.DEFAULT_CHARSET));
         NetworkPacket response = (NetworkPacket)storageClient.sendAsync(host, port, request).get();
-        File file = new File("D:/swarm/downloads/" + fileId);
+        File file = new File(downloadDir + File.separator + fileId);
+        boolean res = file.renameTo(new File(downloadDir + File.separator + fileInfo.getFilename()));
 
         if(response.getType() == PacketTypes.ERROR){
             throw new RuntimeException(new String(response.getContent(), SwarmConstants.DEFAULT_CHARSET));

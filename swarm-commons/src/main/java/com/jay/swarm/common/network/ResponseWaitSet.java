@@ -31,8 +31,6 @@ public class ResponseWaitSet {
         CompletableFuture<Object> remove = waitSet.remove(packetId);
         if(remove != null){
             remove.complete(object);
-        }else{
-            log.info("no future for id={} type={}", packetId, ((NetworkPacket)object).getType());
         }
     }
 }
